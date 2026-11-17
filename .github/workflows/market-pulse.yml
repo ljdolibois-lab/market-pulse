@@ -55,4 +55,4 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python market_pulse.py run --slot "${{ steps.slot.outputs.slot }}" ${{ github.event_name == 'workflow_dispatch' && '--force' || '' }}
+          python market_pulse.py run --slot "${{ steps.slot.outputs.slot }}" ${{ github.event_name == 'workflow_dispatch' && '--force --push' || '' }}
