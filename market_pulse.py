@@ -50,7 +50,13 @@ def load_config():
     local = os.path.join(ROOT, "local_settings.json")  # private, git-ignored
     if os.path.exists(local):
         with open(local) as f:
-            cfg.update(json.load(f))
+            for k, v in json.load(f).items():
+                if isinstance(v, dict) and isinstance(cfg.get(k), dict):
+                    cfg[k] = {**cfg[k], **v}
+                else:
+                    cfg[k] = v
+    if os.environ.get("NTFY_TOPIC"):  # GitHub secret in the cloud
+        cfg.setdefault("phone_push", {})["topic"] = os.environ["NTFY_TOPIC"]
     return cfg
 
 
@@ -501,7 +507,8 @@ def notify(title, subtitle, message):
     def q(s):
         return s.replace("\\", "\\\\").replace('"', '\\"')
     script = f'display notification "{q(message)}" with title "{q(title)}" subtitle "{q(subtitle)}" sound name "Glass"'
-    subprocess.run(["osascript", "-e", script], check=False)
+    if shutil.which("osascript"):  # macOS only; skipped on GitHub's Linux servers
+        subprocess.run(["osascript", "-e", script], check=False)
 
 
 SITE = os.path.join(ROOT, ".site")
@@ -519,7 +526,11 @@ def publish_site(cfg, stamp):
     if not os.path.isdir(os.path.join(SITE, ".git")):
         os.makedirs(SITE, exist_ok=True)
         git("init", "-q")
-        git("remote", "add", "origin", pub["remote"])
+        remote = pub["remote"]
+        token = os.environ.get("GITHUB_TOKEN")  # set inside GitHub Actions
+        if token and remote.startswith("https://github.com/"):
+            remote = remote.replace("https://", f"https://x-access-token:{token}@", 1)
+        git("remote", "add", "origin", remote)
         git("config", "user.name", "Market Pulse")
         git("config", "user.email", pub.get("email", "marketpulse@users.noreply.github.com"))
     for name in os.listdir(SITE):
@@ -598,12 +609,31 @@ def archive_list():
     return out
 
 
+def slot_mode(slot, now):
+    """Cloud runs: GitHub's cron is in UTC and can't follow daylight saving, so the workflow
+    fires at both possible UTC times and this decides, in Eastern time, whether to run."""
+    if now.weekday() >= 5:
+        return None
+    t = now.hour * 60 + now.minute
+    if slot == "am":
+        return "briefing" if 9 * 60 + 30 <= t < 11 * 60 + 15 else None
+    if slot == "pm":
+        return "briefing" if 16 * 60 <= t < 17 * 60 + 45 else None
+    return "intraday" if market_state(now) == "open" else None
+
+
 def cmd_run(args):
     cfg = load_config()
     for d in (OUT, ARCHIVE, DATA, LOGS):
         os.makedirs(d, exist_ok=True)
     now = dt.datetime.now(NY)
     state = market_state(now)
+    if args.slot:
+        mode = slot_mode(args.slot, now)
+        if not mode and not args.force:
+            print(f"[{now:%Y-%m-%d %H:%M} ET] slot '{args.slot}' is outside its Eastern-time window; skipping.")
+            return
+        args.mode = mode or ("intraday" if args.slot == "intraday" else "briefing")
 
     t0 = time.time()
     with cf.ThreadPoolExecutor(max_workers=2) as ex:
@@ -665,7 +695,8 @@ def cmd_run(args):
             print("  site still deploying; sending push anyway")
         push_phone(cfg, label, brief, top, force=args.push)
     if args.open or (is_briefing and cfg.get("open_dashboard_on_briefing", True)):
-        subprocess.run(["open", DASHBOARD], check=False)
+        if sys.platform == "darwin":
+            subprocess.run(["open", DASHBOARD], check=False)
 
 
 # --------------------------------------------------------------------------- schedule (launchd)
@@ -771,6 +802,8 @@ def main():
     r.add_argument("--mode", choices=["auto", "briefing", "intraday"], default="auto")
     r.add_argument("--open", action="store_true", help="open the dashboard when done")
     r.add_argument("--push", action="store_true", help="also send a test push to your phone")
+    r.add_argument("--slot", choices=["am", "pm", "intraday"], help="cloud schedule slot (GitHub Actions)")
+    r.add_argument("--force", action="store_true", help="run a --slot even outside its time window")
     sub.add_parser("install")
     sub.add_parser("uninstall")
     sub.add_parser("status")

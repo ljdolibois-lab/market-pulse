@@ -1,0 +1,58 @@
+name: Market Pulse
+
+# GitHub cron runs in UTC and ignores daylight saving, so each slot fires at both
+# possible UTC times; market_pulse.py checks Eastern time and skips the wrong one.
+on:
+  schedule:
+    - cron: "45 13 * * 1-5"      # am briefing (9:45 ET during daylight time)
+    - cron: "45 14 * * 1-5"      # am briefing (9:45 ET during standard time)
+    - cron: "15 20 * * 1-5"      # pm briefing (4:15 ET during daylight time)
+    - cron: "15 21 * * 1-5"      # pm briefing (4:15 ET during standard time)
+    - cron: "5,35 13-20 * * 1-5" # intraday refresh while the market is open
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "Which run"
+        type: choice
+        options: [am, pm, intraday]
+        default: am
+
+permissions:
+  contents: write
+
+concurrency:
+  group: market-pulse-${{ github.event.schedule || inputs.slot }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Pick slot
+        id: slot
+        run: |
+          case "${{ github.event.schedule }}" in
+            "45 13 * * 1-5"|"45 14 * * 1-5") echo "slot=am" >> "$GITHUB_OUTPUT" ;;
+            "15 20 * * 1-5"|"15 21 * * 1-5") echo "slot=pm" >> "$GITHUB_OUTPUT" ;;
+            "") echo "slot=${{ inputs.slot }}" >> "$GITHUB_OUTPUT" ;;
+            *) echo "slot=intraday" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Restore briefing archive from the live site
+        run: |
+          mkdir -p output
+          git fetch --depth=1 origin gh-pages && git archive FETCH_HEAD archive | tar -x -C output || echo "no archive yet"
+
+      - name: Build, publish and push
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python market_pulse.py run --slot "${{ steps.slot.outputs.slot }}" ${{ github.event_name == 'workflow_dispatch' && '--force' || '' }}

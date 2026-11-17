@@ -201,5 +201,20 @@
       "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664"
     ]
   ],
-  "headlines_per_source": 8
+  "headlines_per_source": 8,
+  "phone_push": {
+    "_comment": "Phone push via the free ntfy app. The topic is private: it lives in local_settings.json on the Mac and in the NTFY_TOPIC GitHub secret.",
+    "enabled": true,
+    "server": "https://ntfy.sh",
+    "push_on": [
+      "morning"
+    ]
+  },
+  "publish": {
+    "enabled": true,
+    "remote": "https://github.com/ljdolibois-lab/market-pulse.git",
+    "branch": "gh-pages",
+    "url": "https://ljdolibois-lab.github.io/market-pulse/",
+    "email": "274109028+ljdolibois-lab@users.noreply.github.com"
+  }
 }
