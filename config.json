@@ -207,7 +207,8 @@
     "enabled": true,
     "server": "https://ntfy.sh",
     "push_on": [
-      "morning"
+      "morning",
+      "closing"
     ]
   },
   "publish": {

@@ -10,7 +10,7 @@ A personal markets dashboard that briefs me twice every trading day.
 **Live dashboard:** https://ljdolibois-lab.github.io/market-pulse/ (republished on every run)
 
 ## Phone push
-The morning briefing is also sent to my phone through the free **ntfy** app. Tapping the notification opens the live dashboard. The ntfy topic and publishing settings live in `local_settings.json`, which is kept off GitHub. To get the closing briefing on your phone too, set `push_on` to `["morning", "closing"]`. To send a test push, run `python3 market_pulse.py run --push`.
+The morning and closing briefings are also sent to my phone through the free **ntfy** app. Tapping the notification opens the live dashboard. The ntfy topic and publishing settings live in `local_settings.json`, which is kept off GitHub. To get the closing briefing on your phone too, set `push_on` to `["morning", "closing"]`. To send a test push, run `python3 market_pulse.py run --push`.
 
 ## What's on it
 - **The Brief**: a plain-English summary written automatically from the data. It covers index moves, how many sectors are up, sector leaders and laggards, risk-on vs. risk-off rotation, VIX, the 10-year yield in basis points, oil, gold, the dollar and bitcoin
