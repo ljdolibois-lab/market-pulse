@@ -34,7 +34,8 @@ To change symbols, news sources or times, edit `config.json`. After changing tim
 - Prices come from Yahoo Finance's chart endpoint (5-minute bars). News comes from RSS feeds. The fetches run in parallel and the whole run takes about 2 seconds
 - A rule-based engine turns the numbers into the written brief
 - The page is a static HTML file with no server. It reloads itself every 5 minutes, so an open tab stays current
-- macOS `launchd` handles the schedule. If the Mac is asleep at a scheduled time, the run happens when it wakes
+- **GitHub Actions** runs it in the cloud on a weekday schedule (`.github/workflows/market-pulse.yml`). It publishes the dashboard to GitHub Pages and sends the phone push even when my laptop is asleep. GitHub's cron runs in UTC, so each run is scheduled at both possible UTC times and the script checks Eastern time to handle daylight saving
+- On the Mac, `launchd` also runs it for desktop notifications and a local copy of the dashboard
 
 ## Interview talking points
 > "I built a small program that runs on my laptop every trading day. At 9:45 it pulls the indices, sectors, Treasury yields, oil and gold, plus the WSJ and Yahoo Finance headlines. It writes me a short brief on what's moving and why, and sends me a notification. It refreshes through the day and sends a closing recap after 4. It also archives every briefing, so on Friday I can look back at how the week developed."
