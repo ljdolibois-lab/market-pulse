@@ -1,0 +1,6 @@
+output/
+local_settings.json
+.site/
+*.tmp
+__pycache__/
+.claude/

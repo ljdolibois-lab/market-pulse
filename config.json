@@ -1,0 +1,205 @@
+{
+  "_comment": "Edit symbols and schedule here. Schedule times are US/Eastern (market time); the installer converts them to your Mac's local time.",
+  "schedule_et": {
+    "morning_briefing": "09:45",
+    "closing_briefing": "16:15",
+    "intraday_every_minutes": 30
+  },
+  "open_dashboard_on_briefing": true,
+  "notify_on_briefing": true,
+  "indices": [
+    [
+      "^GSPC",
+      "S&P 500"
+    ],
+    [
+      "^DJI",
+      "Dow Jones"
+    ],
+    [
+      "^IXIC",
+      "Nasdaq"
+    ],
+    [
+      "^RUT",
+      "Russell 2000"
+    ],
+    [
+      "^VIX",
+      "VIX"
+    ]
+  ],
+  "futures": [
+    [
+      "ES=F",
+      "S&P Futures"
+    ],
+    [
+      "NQ=F",
+      "Nasdaq Futures"
+    ],
+    [
+      "YM=F",
+      "Dow Futures"
+    ]
+  ],
+  "macro": [
+    [
+      "^TNX",
+      "10Y Treasury"
+    ],
+    [
+      "^TYX",
+      "30Y Treasury"
+    ],
+    [
+      "DX-Y.NYB",
+      "US Dollar"
+    ],
+    [
+      "CL=F",
+      "WTI Crude"
+    ],
+    [
+      "GC=F",
+      "Gold"
+    ],
+    [
+      "BTC-USD",
+      "Bitcoin"
+    ]
+  ],
+  "sectors": [
+    [
+      "XLK",
+      "Technology"
+    ],
+    [
+      "XLC",
+      "Comm. Services"
+    ],
+    [
+      "XLY",
+      "Cons. Discretionary"
+    ],
+    [
+      "XLF",
+      "Financials"
+    ],
+    [
+      "XLI",
+      "Industrials"
+    ],
+    [
+      "XLV",
+      "Health Care"
+    ],
+    [
+      "XLP",
+      "Cons. Staples"
+    ],
+    [
+      "XLE",
+      "Energy"
+    ],
+    [
+      "XLB",
+      "Materials"
+    ],
+    [
+      "XLU",
+      "Utilities"
+    ],
+    [
+      "XLRE",
+      "Real Estate"
+    ]
+  ],
+  "global": [
+    [
+      "^N225",
+      "Nikkei 225"
+    ],
+    [
+      "^HSI",
+      "Hang Seng"
+    ],
+    [
+      "^FTSE",
+      "FTSE 100"
+    ],
+    [
+      "^GDAXI",
+      "DAX"
+    ]
+  ],
+  "watchlist": [
+    [
+      "AAPL",
+      "Apple"
+    ],
+    [
+      "MSFT",
+      "Microsoft"
+    ],
+    [
+      "NVDA",
+      "Nvidia"
+    ],
+    [
+      "AMZN",
+      "Amazon"
+    ],
+    [
+      "GOOGL",
+      "Alphabet"
+    ],
+    [
+      "META",
+      "Meta"
+    ],
+    [
+      "TSLA",
+      "Tesla"
+    ],
+    [
+      "AVGO",
+      "Broadcom"
+    ],
+    [
+      "JPM",
+      "JPMorgan"
+    ],
+    [
+      "BRK-B",
+      "Berkshire"
+    ],
+    [
+      "GS",
+      "Goldman Sachs"
+    ],
+    [
+      "XOM",
+      "Exxon"
+    ]
+  ],
+  "news_feeds": [
+    [
+      "Wall Street Journal",
+      "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain"
+    ],
+    [
+      "Yahoo Finance",
+      "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC,%5EIXIC,%5EDJI&region=US&lang=en-US"
+    ],
+    [
+      "MarketWatch",
+      "https://feeds.content.dowjones.io/public/rss/mw_topstories"
+    ],
+    [
+      "CNBC",
+      "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664"
+    ]
+  ],
+  "headlines_per_source": 8
+}
