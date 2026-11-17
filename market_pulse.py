@@ -211,6 +211,116 @@ def session_label(now, state):
     return "Weekend Recap" if now.weekday() >= 5 else "Overnight Recap"
 
 
+# --------------------------------------------------------------------------- sector holdings
+
+SSGA = "https://www.ssga.com/us/en/intermediary/library-content/products/fund-data/etfs/us/holdings-daily-us-en-{}.xlsx"
+XNS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+
+
+def read_xlsx_rows(data):
+    """Minimal .xlsx reader (first sheet) using only the standard library."""
+    import io
+    import zipfile
+    z = zipfile.ZipFile(io.BytesIO(data))
+    strings = []
+    if "xl/sharedStrings.xml" in z.namelist():
+        for si in ET.fromstring(z.read("xl/sharedStrings.xml")).iter(XNS + "si"):
+            strings.append("".join(t.text or "" for t in si.iter(XNS + "t")))
+    sheet = ET.fromstring(z.read("xl/worksheets/sheet1.xml"))
+    rows = []
+    for row in sheet.iter(XNS + "row"):
+        vals = []
+        for c in row.iter(XNS + "c"):
+            v = c.find(XNS + "v")
+            if v is None:
+                vals.append("")
+            elif c.get("t") == "s":
+                vals.append(strings[int(v.text)])
+            else:
+                vals.append(v.text or "")
+        rows.append(vals)
+    return rows
+
+
+def fetch_holdings(etf, top_n):
+    """Top holdings + weights for a SPDR sector ETF, from State Street's daily file."""
+    try:
+        rows = read_xlsx_rows(http_get(SSGA.format(etf.lower()), timeout=20))
+    except Exception:
+        return []
+    out, cols = [], None
+    for r in rows:
+        if cols is None:
+            if "Ticker" in r and "Weight" in r and "Name" in r:
+                cols = (r.index("Name"), r.index("Ticker"), r.index("Weight"))
+            continue
+        try:
+            name, tick, w = r[cols[0]], r[cols[1]], float(r[cols[2]])
+        except (IndexError, ValueError):
+            continue
+        if not tick or not re.match(r"^[A-Z]+(\.[A-Z])?$", tick):
+            continue
+        out.append({"ticker": tick.replace(".", "-"), "name": name.title(), "weight": w})
+    out.sort(key=lambda h: h["weight"], reverse=True)
+    return out[:top_n]
+
+
+def fetch_spark(symbols):
+    """Batch prices (20 per request) from Yahoo's spark endpoint."""
+    res = {}
+    for i in range(0, len(symbols), 20):
+        chunk = symbols[i:i + 20]
+        url = ("https://query1.finance.yahoo.com/v7/finance/spark?range=1d&interval=5m&symbols="
+               + urllib.parse.quote(",".join(chunk)))
+        data = []
+        for attempt in range(3):
+            try:
+                data = json.loads(http_get(url))["spark"]["result"]
+                break
+            except Exception:
+                time.sleep(1.5 * (attempt + 1))
+        for r in data or []:
+            try:
+                m = r["response"][0]["meta"]
+            except (KeyError, IndexError, TypeError):
+                continue
+            price, prev = m.get("regularMarketPrice"), m.get("previousClose") or m.get("chartPreviousClose")
+            if price is not None and prev:
+                res[r["symbol"]] = {"price": price, "pct": (price / prev - 1) * 100,
+                                    "name": m.get("shortName") or m.get("longName")}
+    return res
+
+
+def clean_name(n):
+    n = re.sub(r"\s+", " ", n or "").strip()
+    n = re.sub(r",? (Inc\.?|Corporation|Corp\.?|Co\.?|Company|Ltd\.?|plc|PLC|Incorporated|Holdings|Group)$", "", n)
+    return n.strip(" ,")
+
+
+def fetch_sector_movers(cfg):
+    """For each sector ETF: its biggest companies, today's move, and how many points of the
+    sector's move each one is responsible for (weight x move)."""
+    top_n = cfg.get("holdings_per_sector", 12)
+    sectors = cfg.get("sectors", [])
+    with cf.ThreadPoolExecutor(max_workers=4) as ex:
+        holdings = dict(zip([s for s, _ in sectors], ex.map(lambda s: fetch_holdings(s[0], top_n), sectors)))
+    tickers = sorted({h["ticker"] for hs in holdings.values() for h in hs})
+    prices = fetch_spark(tickers) if tickers else {}
+    out = {}
+    for etf, hs in holdings.items():
+        rows = []
+        for h in hs:
+            p = prices.get(h["ticker"])
+            if not p:
+                continue
+            rows.append({"ticker": h["ticker"], "name": clean_name(p["name"] or h["name"]),
+                         "weight": h["weight"], "price": p["price"], "pct": p["pct"],
+                         "impact": h["weight"] / 100 * p["pct"]})
+        rows.sort(key=lambda r: abs(r["impact"]), reverse=True)
+        out[etf] = rows
+    return out
+
+
 # --------------------------------------------------------------------------- the written brief
 
 def by_sym(quotes):
@@ -220,125 +330,128 @@ def by_sym(quotes):
 def fmt_pct(p, digits=2):
     if p is None:
         return "n/a"
-    sign = "+" if p > 0 else ("−" if p < 0 else "")
+    if round(abs(p), digits) == 0:
+        return f"{0:.{digits}f}%"
+    sign = "+" if p > 0 else "−"
     return f"{sign}{abs(p):.{digits}f}%"
 
 
-def move_phrase(p, live):
-    a = abs(p)
+def headline(spx_pct, secs, vix, futures_pct=None):
+    if futures_pct is not None:
+        return f"Futures point {'higher' if futures_pct > 0 else 'lower'} ahead of the open"
+    a = abs(spx_pct)
     if a < 0.15:
-        return "is roughly flat" if live else "finished roughly flat"
-    if live:
-        word = "up" if p > 0 else "down"
-        strength = "sharply " if a >= 1.5 else ""
-        return f"is {strength}{word} {a:.2f}%"
-    if p > 0:
-        verb = "rallied" if a >= 1.5 else ("gained" if a >= 0.5 else "edged up")
+        h = "Stocks hold steady"
+    elif spx_pct > 0:
+        h = "Stocks edge higher" if a < 0.5 else ("Stocks rise" if a < 1.5 else "Stocks rally")
     else:
-        verb = "sold off" if a >= 1.5 else ("fell" if a >= 0.5 else "slipped")
-    return f"{verb} {a:.2f}%"
-
-
-def build_brief(quotes, news, state, holiday):
-    s = by_sym(quotes)
-    live = state == "open" and not holiday
-    lines = []
-
-    spx, ndx, dji, rut = s.get("^GSPC"), s.get("^IXIC"), s.get("^DJI"), s.get("^RUT")
-    if state == "pre" and s.get("ES=F") and s["ES=F"]["pct"] is not None:
-        es = s["ES=F"]
-        nq = s.get("NQ=F")
-        d = "higher" if es["pct"] > 0 else "lower"
-        txt = f"Before the bell, S&P 500 futures are pointing {d} ({fmt_pct(es['pct'])})"
-        if nq and nq["pct"] is not None:
-            txt += f" and Nasdaq futures are {fmt_pct(nq['pct'])}"
-        lines.append(txt + ".")
-    elif spx and spx["pct"] is not None:
-        txt = f"The S&P 500 {move_phrase(spx['pct'], live)} to {spx['price']:,.2f}"
-        parts = []
-        if dji and dji["pct"] is not None:
-            parts.append(f"the Dow {fmt_pct(dji['pct'])}")
-        if ndx and ndx["pct"] is not None:
-            parts.append(f"the Nasdaq {fmt_pct(ndx['pct'])}")
-        if parts:
-            txt += ", with " + " and ".join(parts)
-        txt += "."
-        if rut and rut["pct"] is not None and spx["pct"] is not None:
-            gap = rut["pct"] - spx["pct"]
-            if abs(gap) >= 0.75:
-                txt += (" Small caps are outperforming" if gap > 0 else " Small caps are lagging") + \
-                       f" (Russell 2000 {fmt_pct(rut['pct'])})."
-        lines.append(txt)
-        if spx.get("pct_5d") is not None:
-            ctx = f"Over the past week the S&P is {fmt_pct(spx['pct_5d'])}"
-            if spx.get("pct_1m") is not None:
-                ctx += f" and {fmt_pct(spx['pct_1m'])} over the past month"
-            if spx.get("off_high") is not None and spx["off_high"] < -0.5:
-                ctx += f"; it sits {abs(spx['off_high']):.1f}% below its 3-month high"
-            lines.append(ctx + ".")
-
-    secs = [q for q in quotes.get("sectors", []) if q["pct"] is not None]
+        h = "Stocks edge lower" if a < 0.5 else ("Stocks fall" if a < 1.5 else "Stocks sell off")
     if secs:
         up = sum(1 for q in secs if q["pct"] > 0)
         best = max(secs, key=lambda q: q["pct"])
         worst = min(secs, key=lambda q: q["pct"])
-        n = len(secs)
         if up == 0:
-            txt = f"All {n} sectors are lower; {best['name']} is holding up best ({fmt_pct(best['pct'])}) " \
-                  f"while {worst['name']} is the weakest ({fmt_pct(worst['pct'])})."
-        elif up == n:
-            txt = f"All {n} sectors are higher, led by {best['name']} ({fmt_pct(best['pct'])}); " \
-                  f"{worst['name']} is the laggard ({fmt_pct(worst['pct'])})."
+            h += f" as all {len(secs)} sectors decline"
+        elif up == len(secs):
+            h += f" as all {len(secs)} sectors advance"
+        elif spx_pct >= 0:
+            h += f", led by {best['name']}"
         else:
-            txt = f"{up} of {n} sectors are higher; {best['name']} leads ({fmt_pct(best['pct'])}) " \
-                  f"and {worst['name']} trails ({fmt_pct(worst['pct'])})."
-        sp = {q["symbol"]: q["pct"] for q in secs}
-        defensive = [sp[k] for k in ("XLP", "XLU", "XLV") if k in sp]
-        growth = [sp[k] for k in ("XLK", "XLY", "XLC") if k in sp]
-        if defensive and growth:
-            spread = sum(defensive) / len(defensive) - sum(growth) / len(growth)
-            if spread > 0.75:
-                txt += " Defensive sectors are beating growth — a risk-off rotation."
-            elif spread < -0.75:
-                txt += " Growth sectors are beating defensives — a risk-on tone."
-        lines.append(txt)
+            h += f", dragged by {worst['name']}"
+    if vix and vix.get("pct") is not None and vix["price"] >= 20 and abs(vix["pct"]) >= 5:
+        h += f"; VIX {'jumps' if vix['pct'] > 0 else 'eases'} to {vix['price']:.1f}"
+    return h
 
-    macro = []
-    vix = s.get("^VIX")
+
+def build_brief(quotes, news, state, holiday, movers=None):
+    """Returns (headline, rows, top_stories). rows = [(label, text)], short and scannable."""
+    s = by_sym(quotes)
+    rows = []
+    secs = [q for q in quotes.get("sectors", []) if q["pct"] is not None]
+    spx, ndx, dji, rut, vix = (s.get(k) for k in ("^GSPC", "^IXIC", "^DJI", "^RUT", "^VIX"))
+
+    if state == "pre" and s.get("ES=F") and s["ES=F"]["pct"] is not None:
+        parts = [f"{q['name']} {fmt_pct(q['pct'])}" for q in quotes.get("futures", []) if q["pct"] is not None]
+        rows.append(("Futures", " · ".join(parts)))
+        head = headline(0, [], None, futures_pct=s["ES=F"]["pct"])
+    elif spx and spx["pct"] is not None:
+        parts = [f"S&P 500 {fmt_pct(spx['pct'])} at {spx['price']:,.0f}"]
+        for q, n in ((dji, "Dow"), (ndx, "Nasdaq"), (rut, "Russell 2000")):
+            if q and q["pct"] is not None:
+                parts.append(f"{n} {fmt_pct(q['pct'])}")
+        rows.append(("Indices", " · ".join(parts)))
+        head = headline(spx["pct"], secs, vix)
+        if spx.get("pct_5d") is not None:
+            t = [f"{fmt_pct(spx['pct_5d'])} this week"]
+            if spx.get("pct_1m") is not None:
+                t.append(f"{fmt_pct(spx['pct_1m'])} this month")
+            if spx.get("off_high") is not None and spx["off_high"] < -0.5:
+                t.append(f"{abs(spx['off_high']):.1f}% below 3-month high")
+            rows.append(("Trend", "S&P " + " · ".join(t)))
+    else:
+        head = "Market data unavailable right now"
+
+    if secs:
+        up = sum(1 for q in secs if q["pct"] > 0)
+        best = max(secs, key=lambda q: q["pct"])
+        worst = min(secs, key=lambda q: q["pct"])
+        t = f"{up} of {len(secs)} up · Best: {best['name']} {fmt_pct(best['pct'])} · " \
+            f"Worst: {worst['name']} {fmt_pct(worst['pct'])}"
+        sp = {q["symbol"]: q["pct"] for q in secs}
+        dfn = [sp[k] for k in ("XLP", "XLU", "XLV") if k in sp]
+        grw = [sp[k] for k in ("XLK", "XLY", "XLC") if k in sp]
+        if dfn and grw:
+            spread = sum(dfn) / len(dfn) - sum(grw) / len(grw)
+            if spread > 0.75:
+                t += " · Risk-off: defensives beating growth"
+            elif spread < -0.75:
+                t += " · Risk-on: growth beating defensives"
+        rows.append(("Sectors", t))
+
+    allm = {r["ticker"]: r for rs in (movers or {}).values() for r in rs}
+    if len(allm) >= 4:
+        ranked = sorted(allm.values(), key=lambda r: r["pct"])
+        ups = [r for r in reversed(ranked) if r["pct"] > 0][:2]
+        dns = [r for r in ranked if r["pct"] < 0][:2]
+        rows.append(("Big movers", " · ".join(f"{r['name']} {fmt_pct(r['pct'])}" for r in ups + dns)))
+    else:
+        wl = sorted((q for q in quotes.get("watchlist", []) if q["pct"] is not None), key=lambda q: q["pct"])
+        if wl:
+            rows.append(("Big movers", f"{wl[-1]['name']} {fmt_pct(wl[-1]['pct'])} · "
+                                       f"{wl[0]['name']} {fmt_pct(wl[0]['pct'])}"))
+
     if vix and vix["price"] is not None:
-        lvl = "elevated" if vix["price"] >= 20 else "calm"
-        if vix["price"] >= 30:
-            lvl = "high-stress"
-        macro.append(f"the VIX is {vix['price']:.1f} ({lvl}, {fmt_pct(vix['pct'], 1)})")
-    tnx = s.get("^TNX")
+        lvl = "high stress" if vix["price"] >= 30 else ("elevated" if vix["price"] >= 20 else "calm")
+        rows.append(("Volatility", f"VIX {vix['price']:.1f} ({lvl}) · {fmt_pct(vix['pct'], 1)} today"))
+
+    tnx, dxy = s.get("^TNX"), s.get("DX-Y.NYB")
+    parts = []
     if tnx and tnx["price"] is not None and tnx["change"] is not None:
         bps = tnx["change"] * 100
-        macro.append(f"the 10-year yield is {tnx['price']:.2f}% ({'+' if bps >= 0 else '−'}{abs(bps):.0f} bps)")
-    oil, gold, btc, dxy = s.get("CL=F"), s.get("GC=F"), s.get("BTC-USD"), s.get("DX-Y.NYB")
-    if oil and oil["pct"] is not None:
-        macro.append(f"WTI crude is ${oil['price']:.2f} ({fmt_pct(oil['pct'])})")
-    if gold and gold["pct"] is not None:
-        macro.append(f"gold is {fmt_pct(gold['pct'])}")
+        parts.append(f"10-yr yield {tnx['price']:.2f}% ({'+' if bps >= 0 else '−'}{abs(bps):.0f} bps)")
     if dxy and dxy["pct"] is not None:
-        macro.append(f"the dollar is {fmt_pct(dxy['pct'])}")
+        parts.append(f"Dollar {fmt_pct(dxy['pct'])}")
+    if parts:
+        rows.append(("Rates & dollar", " · ".join(parts)))
+
+    oil, gold, btc = s.get("CL=F"), s.get("GC=F"), s.get("BTC-USD")
+    parts = []
+    if oil and oil["pct"] is not None:
+        parts.append(f"Oil ${oil['price']:.2f} ({fmt_pct(oil['pct'])})")
+    if gold and gold["pct"] is not None:
+        parts.append(f"Gold {fmt_pct(gold['pct'])}")
     if btc and btc["pct"] is not None:
-        macro.append(f"bitcoin is {fmt_pct(btc['pct'])}")
-    if macro:
-        m = "; ".join(macro)
-        lines.append(m[0].upper() + m[1:] + ".")
+        parts.append(f"Bitcoin {fmt_pct(btc['pct'])}")
+    if parts:
+        rows.append(("Commodities", " · ".join(parts)))
 
-    wl = [q for q in quotes.get("watchlist", []) if q["pct"] is not None]
-    if wl:
-        wl.sort(key=lambda q: q["pct"])
-        lo, hi = wl[0], wl[-1]
-        lines.append(f"Biggest watchlist movers: {hi['name']} {fmt_pct(hi['pct'])}, "
-                     f"{lo['name']} {fmt_pct(lo['pct'])}.")
+    top = [(f["source"], f["items"][0]) for f in news if f["items"]][:3]
+    return head, rows, top
 
-    top = []
-    for f in news:
-        if f["items"]:
-            top.append((f["source"], f["items"][0]))
-    return lines, top[:3]
+
+def brief_lines(head, rows):
+    """Plain-text version for the terminal, notifications and phone pushes."""
+    return [head] + [f"{l}: {t}" for l, t in rows]
 
 
 # --------------------------------------------------------------------------- rendering
@@ -415,6 +528,56 @@ def heat_style(p):
     return f"background: rgba({hue}, {0.12 + a * 0.6:.2f});"
 
 
+def color_nums(text):
+    """Color +x% / −x% / bps figures green or red inside already-escaped text."""
+    def sub(m):
+        c = "up" if m.group(0).startswith("+") else "down"
+        return f'<span class="{c}">{m.group(0)}</span>'
+    return re.sub(r"[+−]\d[\d,]*(?:\.\d+)?(?:%| bps)", sub, text)
+
+
+def mover_rows(rows, show_impact):
+    if not rows:
+        return '<p class="muted">Holdings data unavailable right now.</p>'
+    mx = max(abs(r["impact"] if show_impact else r["pct"]) for r in rows) or 1
+    out = []
+    for r in rows:
+        v = r["impact"] if show_impact else r["pct"]
+        w = abs(v) / mx * 50
+        bar = (f'<span class="bar {cls(v)}" style="{"left" if v >= 0 else "right"}:50%;width:{w:.1f}%"></span>')
+        right = (f'{"+" if r["impact"] > 0 else "−" if r["impact"] < 0 else ""}{abs(r["impact"]):.2f} pts'
+                 if show_impact else esc(r.get("sector", "")))
+        out.append(
+            f'<tr><td class="mv-name"><b>{esc(r["ticker"])}</b> <span class="muted">{esc(r["name"])}</span>'
+            + (f'<span class="wt">{r["weight"]:.1f}% of sector</span>' if show_impact else "")
+            + f'</td><td class="num chg {cls(r["pct"])}">{fmt_pct(r["pct"])}</td>'
+            f'<td class="mv-bar"><span class="track">{bar}<span class="mid"></span></span></td>'
+            f'<td class="num muted mv-imp">{right}</td></tr>')
+    return "<table class=\"mv\">" + "".join(out) + "</table>"
+
+
+def movers_panels(secs, movers):
+    names = {q["symbol"]: q["name"] for q in secs}
+    pct = {q["symbol"]: q["pct"] for q in secs}
+    seen, allrows = set(), []
+    for etf, rs in movers.items():
+        for r in rs:
+            if r["ticker"] not in seen:
+                seen.add(r["ticker"])
+                allrows.append({**r, "sector": names.get(etf, etf)})
+    allrows.sort(key=lambda r: abs(r["pct"]), reverse=True)
+    html_out = (f'<div class="mv-panel" data-for="all"><div class="mv-head"><b>Biggest moves among the largest companies</b>'
+                f'<span class="muted">Tap a sector to see what is driving it</span></div>'
+                f'{mover_rows(allrows[:10], False)}</div>')
+    for etf, rs in movers.items():
+        html_out += (f'<div class="mv-panel" data-for="{esc(etf)}" hidden><div class="mv-head">'
+                     f'<b>{esc(names.get(etf, etf))} <span class="chg {cls(pct.get(etf))}">{fmt_pct(pct.get(etf))}</span></b>'
+                     f'<button type="button" class="mv-back">Show all</button></div>'
+                     f'<p class="mv-note muted">Top holdings ranked by impact: how many points of the sector\'s move each company accounts for (weight × move).</p>'
+                     f'{mover_rows(rs[:10], True)}</div>')
+    return html_out
+
+
 def ago(ts, now_ts):
     if not ts:
         return ""
@@ -428,7 +591,7 @@ def ago(ts, now_ts):
     return f"{m // 1440}d ago"
 
 
-def render(cfg, quotes, news, now, state, holiday, label, brief, top, archive_links, is_snapshot=False):
+def render(cfg, quotes, news, movers, now, state, holiday, label, brief, top, archive_links, is_snapshot=False):
     now_ts = now.timestamp()
     state_text = {"pre": "Pre-market", "open": "Market open", "after": "After hours", "closed": "Market closed"}[state]
     if holiday:
@@ -445,9 +608,11 @@ def render(cfg, quotes, news, now, state, holiday, label, brief, top, archive_li
 
     secs = sorted(quotes["sectors"], key=lambda q: q["pct"] if q["pct"] is not None else -99, reverse=True)
     heat = "".join(
-        f'<div class="cell" style="{heat_style(q["pct"])}"><span class="c-name">{esc(q["name"])}</span>'
-        f'<span class="c-sym">{esc(q["symbol"])}</span><span class="c-pct">{fmt_pct(q["pct"])}</span></div>'
+        f'<button type="button" class="cell" data-sector="{esc(q["symbol"])}" style="{heat_style(q["pct"])}" '
+        f'aria-pressed="false"><span class="c-name">{esc(q["name"])}</span>'
+        f'<span class="c-sym">{esc(q["symbol"])}</span><span class="c-pct">{fmt_pct(q["pct"])}</span></button>'
         for q in secs)
+    panels = movers_panels(secs, movers or {})
 
     wl = sorted(quotes["watchlist"], key=lambda q: q["pct"] if q["pct"] is not None else 0, reverse=True)
     rows = "".join(
@@ -457,7 +622,9 @@ def render(cfg, quotes, news, now, state, holiday, label, brief, top, archive_li
         f'<td class="sp">{spark(q["series"], q["prev"], 90, 22)}</td></tr>'
         for q in wl)
 
-    brief_html = "".join(f"<p>{esc(l)}</p>" for l in brief)
+    head, brows = brief
+    brief_html = f'<p class="headline">{esc(head)}</p><dl class="brief-rows">' + "".join(
+        f"<dt>{esc(l)}</dt><dd>{color_nums(esc(t))}</dd>" for l, t in brows) + "</dl>"
     top_html = "".join(
         f'<li><span class="src">{esc(src)}</span><a href="{esc(i["link"])}" target="_blank" rel="noopener">{esc(i["title"])}</a></li>'
         for src, i in top)
@@ -492,6 +659,7 @@ def render(cfg, quotes, news, now, state, holiday, label, brief, top, archive_li
         "{{MACRO}}": mac,
         "{{GLOBAL}}": glo,
         "{{HEAT}}": heat,
+        "{{MOVERS}}": panels,
         "{{WATCH}}": rows,
         "{{NEWS}}": news_cols,
         "{{ARCHIVE}}": arch or '<span class="muted">Briefings you receive will be saved here.</span>',
@@ -576,7 +744,7 @@ def push_phone(cfg, label, brief, top, force=False):
     kind = "closing" if "Closing" in label else "morning"
     if not force and kind not in pp.get("push_on", ["morning"]):
         return
-    body = "\n\n".join(brief[:4])
+    body = brief[0] + "\n\n" + "\n".join(brief[1:])
     if top:
         body += "\n\nTop story (" + top[0][0] + "): " + top[0][1]["title"]
     headers = {"Title": f"Market Pulse - {label}", "Tags": "chart_with_upwards_trend",
@@ -636,10 +804,11 @@ def cmd_run(args):
         args.mode = mode or ("intraday" if args.slot == "intraday" else "briefing")
 
     t0 = time.time()
-    with cf.ThreadPoolExecutor(max_workers=2) as ex:
+    with cf.ThreadPoolExecutor(max_workers=3) as ex:
         fq = ex.submit(fetch_all_quotes, cfg)
         fn = ex.submit(fetch_news, cfg)
-        quotes, news = fq.result(), fn.result()
+        fm = ex.submit(fetch_sector_movers, cfg)
+        quotes, news, movers = fq.result(), fn.result(), fm.result()
 
     spx = by_sym(quotes).get("^GSPC")
     holiday = False
@@ -647,11 +816,13 @@ def cmd_run(args):
         holiday = dt.datetime.fromtimestamp(spx["time"], NY).date() != now.date()
 
     label = session_label(now, state)
-    brief, top = build_brief(quotes, news, state, holiday)
+    head, rows, top = build_brief(quotes, news, state, holiday, movers)
+    brief = (head, rows)
+    lines = brief_lines(head, rows)
     is_briefing = args.mode == "briefing"
 
     links = archive_list()
-    page = render(cfg, quotes, news, now, state, holiday, label, brief, top, links)
+    page = render(cfg, quotes, news, movers, now, state, holiday, label, brief, top, links)
     tmp = DASHBOARD + ".tmp"
     with open(tmp, "w") as f:
         f.write(page)
@@ -660,29 +831,29 @@ def cmd_run(args):
     stamp = now.strftime("%Y-%m-%d_%H%M")
     with open(os.path.join(DATA, "latest.json"), "w") as f:
         json.dump({"generated": now.isoformat(), "label": label, "state": state,
-                   "brief": brief, "quotes": quotes, "news": news}, f, indent=1)
+                   "brief": lines, "movers": movers, "quotes": quotes, "news": news}, f, indent=1)
 
     if is_briefing:
         slug = label.replace(" ", "-")
-        snap = render(cfg, quotes, news, now, state, holiday, label, brief, top,
+        snap = render(cfg, quotes, news, movers, now, state, holiday, label, brief, top,
                       [(t, "../" + h if not h.startswith("archive/") else h.replace("archive/", ""))
                        for t, h in links], is_snapshot=True)
         with open(os.path.join(ARCHIVE, f"{stamp}_{slug}.html"), "w") as f:
             f.write(snap)
         shutil.copy(os.path.join(DATA, "latest.json"), os.path.join(DATA, f"{stamp}.json"))
         # re-render so the new snapshot appears in the dashboard's archive list
-        page = render(cfg, quotes, news, now, state, holiday, label, brief, top, archive_list())
+        page = render(cfg, quotes, news, movers, now, state, holiday, label, brief, top, archive_list())
         with open(DASHBOARD, "w") as f:
             f.write(page)
 
     n_q = sum(len(v) for v in quotes.values())
     n_n = sum(len(f["items"]) for f in news)
     print(f"[{now:%Y-%m-%d %H:%M} ET] {label}: {n_q} quotes, {n_n} headlines in {time.time() - t0:.1f}s")
-    for l in brief:
+    for l in lines:
         print("  " + l)
 
     if is_briefing and cfg.get("notify_on_briefing", True):
-        notify("Market Pulse", label, brief[0] if brief else "Dashboard updated.")
+        notify("Market Pulse", label, head)
     page_stamp = f'<meta name="mp-stamp" content="{stamp}-{int(time.time())}">'
     with open(DASHBOARD) as f:
         page = f.read()
@@ -693,7 +864,7 @@ def cmd_run(args):
     if wants_push:
         if live and not wait_until_live(cfg["publish"]["url"], page_stamp):
             print("  site still deploying; sending push anyway")
-        push_phone(cfg, label, brief, top, force=args.push)
+        push_phone(cfg, label, lines, top, force=args.push)
     if args.open or (is_briefing and cfg.get("open_dashboard_on_briefing", True)):
         if sys.platform == "darwin":
             subprocess.run(["open", DASHBOARD], check=False)

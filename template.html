@@ -66,7 +66,35 @@ h2 { font: 600 11px/1 var(--sans); letter-spacing: .12em; text-transform: upperc
 
 .heat { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; }
 .cell { border-radius: 7px; padding: 9px 10px; display: grid; grid-template-columns: 1fr auto; row-gap: 2px;
-        border: 1px solid var(--line); }
+        border: 1px solid var(--line); font: inherit; color: inherit; text-align: left; cursor: pointer;
+        transition: transform .12s ease, box-shadow .12s ease; }
+.cell:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cell[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+.movers { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.mv-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.mv-head b { font-size: 14px; }
+.mv-head .muted { font-size: 12px; }
+.mv-back { font: 600 12px var(--sans); color: var(--accent); background: none; border: 1px solid var(--line);
+           border-radius: 99px; padding: 3px 10px; cursor: pointer; }
+.mv-note { font-size: 12px; margin: 0 0 6px; }
+table.mv td { padding: 6px 3px; font-size: 13px; }
+.mv-name { line-height: 1.25; }
+.mv-name .muted { font-size: 12px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; }
+.wt { display: block; font-size: 11px; color: var(--muted); }
+.mv-bar { width: 26%; }
+.track { position: relative; display: block; height: 8px; }
+.track .mid { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--line); }
+.bar { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+.bar.up { background: var(--up); } .bar.down { background: var(--down); } .bar.flat { background: var(--muted); }
+.mv-imp { font-size: 12px; min-width: 64px; }
+
+.headline { font: 600 21px/1.3 var(--serif) !important; margin: 0 0 14px !important; letter-spacing: -0.005em; }
+.brief-rows { display: grid; grid-template-columns: max-content 1fr; gap: 9px 16px; margin: 0; }
+.brief-rows dt { font: 600 11px/1.9 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.brief-rows dd { margin: 0; font-size: 15px; line-height: 1.45; }
+.brief-rows dd span { font-weight: 600; }
 .c-name { font-weight: 600; font-size: 12.5px; grid-column: 1 / -1; }
 .c-sym { color: var(--muted); font-size: 11px; }
 .c-pct { font-weight: 700; font-size: 13px; }
@@ -106,7 +134,10 @@ footer { margin-top: 26px; color: var(--muted); font-size: 12px; }
   .tile { padding: 10px 11px 6px; }
   .tile.big .t-price, .t-price { font-size: 16px; }
   .t-sym { display: none; }
-  .brief p, .brief p:first-child { font-size: 16px; }
+  .headline { font-size: 19px !important; }
+  .brief-rows { grid-template-columns: 1fr; gap: 2px; }
+  .brief-rows dd { margin-bottom: 8px; }
+  .mv-bar { display: none; }
 }
 </style>
 </head>
@@ -135,8 +166,9 @@ footer { margin-top: 26px; color: var(--muted); font-size: 12px; }
       <ul class="top">{{TOP}}</ul>
     </div>
     <div class="card">
-      <h2>Sector Performance · S&amp;P SPDR ETFs</h2>
+      <h2>Sector Performance · tap a sector</h2>
       <div class="heat">{{HEAT}}</div>
+      <div class="movers">{{MOVERS}}</div>
     </div>
   </div>
 
@@ -168,5 +200,28 @@ footer { margin-top: 26px; color: var(--muted); font-size: 12px; }
 
   <footer>Prices via Yahoo Finance (may be delayed up to 15 minutes). Headlines via WSJ, Yahoo Finance, MarketWatch and CNBC RSS. This page refreshes itself every 5 minutes.</footer>
 </div>
+<script>
+(function () {
+  var cells = document.querySelectorAll('.cell[data-sector]');
+  var panels = document.querySelectorAll('.mv-panel');
+  function show(key) {
+    panels.forEach(function (p) { p.hidden = p.getAttribute('data-for') !== key; });
+    cells.forEach(function (c) { c.setAttribute('aria-pressed', c.getAttribute('data-sector') === key ? 'true' : 'false'); });
+    try { sessionStorage.setItem('mp-sector', key); } catch (e) {}
+  }
+  cells.forEach(function (c) {
+    c.addEventListener('click', function () {
+      var key = c.getAttribute('data-sector');
+      var on = c.getAttribute('aria-pressed') === 'true';
+      show(on ? 'all' : key);
+      if (!on && window.innerWidth < 980) {
+        document.querySelector('.movers').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+  document.querySelectorAll('.mv-back').forEach(function (b) { b.addEventListener('click', function () { show('all'); }); });
+  try { var saved = sessionStorage.getItem('mp-sector'); if (saved && document.querySelector('.mv-panel[data-for="' + saved + '"]')) show(saved); } catch (e) {}
+})();
+</script>
 </body>
 </html>
