@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Market Pulse</title>
+<style>
+:root {
+  --bg: #f6f4ef; --panel: #ffffff; --ink: #16181d; --muted: #6b6f78; --line: #e3e0d8;
+  --accent: #1d3a6e; --up: #157a46; --down: #c0352b; --up-rgb: 21,122,70; --down-rgb: 192,53,43;
+  --serif: "Iowan Old Style", "Charter", Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f1115; --panel: #171a20; --ink: #e9eaee; --muted: #8d929c; --line: #262a32;
+          --accent: #8fb0ff; --up: #3ecf7f; --down: #ff6b5e; --up-rgb: 62,207,127; --down-rgb: 255,107,94; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans);
+       font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 24px 20px 48px; }
+a { color: inherit; text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 2px; }
+.muted { color: var(--muted); }
+
+header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap;
+         border-bottom: 2px solid var(--ink); padding-bottom: 14px; margin-bottom: 20px; }
+.mast { font: 700 30px/1 var(--serif); letter-spacing: -0.01em; }
+.mast small { display: block; font: 600 12px/1 var(--sans); letter-spacing: .12em; text-transform: uppercase;
+              color: var(--accent); margin-bottom: 8px; }
+.sub { color: var(--muted); margin-top: 6px; }
+.status { text-align: right; color: var(--muted); font-size: 13px; }
+.pill { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; color: var(--ink);
+        border: 1px solid var(--line); background: var(--panel); border-radius: 99px; padding: 4px 11px; margin-bottom: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.live .dot { background: var(--up); box-shadow: 0 0 0 3px rgba(var(--up-rgb), .2); }
+
+h2 { font: 600 11px/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+     margin: 0 0 10px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+.section { margin-bottom: 22px; }
+
+.tiles { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px 8px; min-width: 0; }
+.t-name { font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; gap: 6px; }
+.t-sym { color: var(--muted); font-weight: 400; font-size: 11px; }
+.t-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 4px 0 4px; flex-wrap: wrap; }
+.t-price { font-size: 17px; font-weight: 600; }
+.tile.big .t-price { font-size: 22px; letter-spacing: -0.01em; }
+.chg { font-weight: 600; font-size: 13px; white-space: nowrap; }
+.up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--muted); }
+.spark { width: 100%; height: 30px; display: block; overflow: visible; }
+.tile.big .spark { height: 40px; }
+.spark polyline { fill: none; stroke-width: 1.6; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.spark.up polyline { stroke: var(--up); } .spark.down polyline { stroke: var(--down); }
+.spark .base { stroke: var(--muted); stroke-dasharray: 2 3; stroke-width: 1; vector-effect: non-scaling-stroke; opacity: .6; }
+
+.grid2 { display: grid; gap: 16px; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); }
+.brief p { font: 17px/1.6 var(--serif); margin: 0 0 10px; }
+.brief p:first-child { font-size: 19px; }
+.top { list-style: none; padding: 12px 0 0; margin: 12px 0 0; border-top: 1px solid var(--line); }
+.top li { padding: 5px 0; font-weight: 500; }
+.src { display: inline-block; min-width: 158px; font-size: 11px; font-weight: 600; letter-spacing: .06em;
+       text-transform: uppercase; color: var(--accent); }
+
+.heat { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; }
+.cell { border-radius: 7px; padding: 9px 10px; display: grid; grid-template-columns: 1fr auto; row-gap: 2px;
+        border: 1px solid var(--line); }
+.c-name { font-weight: 600; font-size: 12.5px; grid-column: 1 / -1; }
+.c-sym { color: var(--muted); font-size: 11px; }
+.c-pct { font-weight: 700; font-size: 13px; }
+
+.row2 { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.first { order: -1; }
+.stack { display: flex; flex-direction: column; }
+
+.feeds { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.feed h3 { font: 700 15px/1.2 var(--serif); margin: 0 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.feed ol { list-style: none; margin: 0; padding: 0; }
+.feed li { padding: 7px 0; border-bottom: 1px dashed var(--line); display: flex; justify-content: space-between; gap: 10px; }
+.feed li:last-child { border-bottom: 0; }
+.when { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+table { width: 100%; border-collapse: collapse; }
+td { padding: 7px 4px; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+.num { text-align: right; white-space: nowrap; }
+td.sp { width: 96px; padding-left: 12px; }
+td.sp .spark { height: 22px; }
+
+.archive { display: flex; flex-wrap: wrap; gap: 8px; }
+.archive a { border: 1px solid var(--line); background: var(--panel); border-radius: 99px; padding: 4px 11px; font-size: 12.5px; }
+footer { margin-top: 26px; color: var(--muted); font-size: 12px; }
+
+@media (max-width: 980px) {
+  .grid2, .row2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .wrap { padding: 16px 16px 40px; }
+  .feeds { grid-template-columns: 1fr; }
+  .mast { font-size: 25px; }
+  .status { text-align: left; }
+  .src { display: block; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .tile { padding: 10px 11px 6px; }
+  .tile.big .t-price, .t-price { font-size: 16px; }
+  .t-sym { display: none; }
+  .brief p, .brief p:first-child { font-size: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="mast"><small>Closing Briefing</small>Market Pulse</div>
+      <div class="sub">Tuesday, November 17, 2026</div>
+    </div>
+    <div class="status">
+      <div class="pill idle"><span class="dot"></span>After hours</div>
+      <div>Updated 10:26 PM UTC · 5:26 PM ET</div>
+    </div>
+  </header>
+
+  <div class="section">
+    <h2>Major Indices</h2>
+    <div class="tiles">
+    <div class="tile big">
+      <div class="t-name">S&amp;P 500<span class="t-sym">^GSPC</span></div>
+      <div class="t-row">
+        <div class="t-price">7,340.53</div>
+        <div class="chg down">▼ −1.03%</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 160 40" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="160" y1="2.0" y2="2.0" class="base"/><polyline points="0.0,8.1 2.1,7.1 4.1,7.9 6.2,4.6 8.2,3.7 10.3,3.3 12.3,7.1 14.4,10.5 16.4,9.2 18.5,11.8 20.5,10.8 22.6,11.4 24.6,17.6 26.7,19.3 28.7,28.1 30.8,34.1 32.8,38.0 34.9,26.6 36.9,24.4 39.0,22.2 41.0,22.6 43.1,25.3 45.1,26.3 47.2,26.4 49.2,28.6 51.3,29.3 53.3,30.0 55.4,32.6 57.4,34.0 59.5,28.0 61.5,32.5 63.6,25.9 65.6,25.5 67.7,18.1 69.7,20.1 71.8,20.6 73.8,23.1 75.9,25.9 77.9,23.1 80.0,26.2 82.1,26.1 84.1,26.3 86.2,25.8 88.2,25.7 90.3,27.5 92.3,25.9 94.4,24.0 96.4,20.9 98.5,21.8 100.5,25.3 102.6,26.4 104.6,26.5 106.7,28.2 108.7,27.6 110.8,28.4 112.8,27.9 114.9,24.3 116.9,25.3 119.0,27.5 121.0,27.6 123.1,28.2 125.1,28.7 127.2,28.9 129.2,31.0 131.3,31.4 133.3,34.0 135.4,33.2 137.4,33.1 139.5,32.6 141.5,31.3 143.6,30.0 145.6,30.6 147.7,27.1 149.7,27.8 151.8,27.8 153.8,28.8 155.9,30.3 157.9,24.3 160.0,24.3"/></svg>
+    </div>
+    <div class="tile big">
+      <div class="t-name">Dow Jones<span class="t-sym">^DJI</span></div>
+      <div class="t-row">
+        <div class="t-price">50,759.42</div>
+        <div class="chg down">▼ −1.64%</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 160 40" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="160" y1="2.0" y2="2.0" class="base"/><polyline points="0.0,14.7 2.1,14.3 4.1,14.0 6.2,10.4 8.2,7.5 10.3,10.2 12.3,12.6 14.4,15.0 16.4,14.6 18.5,16.6 20.5,15.5 22.6,14.7 24.6,19.0 26.7,20.3 28.7,27.5 30.8,31.4 32.8,35.1 34.9,29.2 36.9,28.7 39.0,27.5 41.0,27.6 43.1,29.2 45.1,29.9 47.2,30.5 49.2,31.2 51.3,32.3 53.3,32.8 55.4,33.9 57.4,33.8 59.5,29.6 61.5,33.0 63.6,28.6 65.6,28.3 67.7,23.7 69.7,25.4 71.8,26.0 73.8,27.3 75.9,29.4 77.9,26.8 80.0,28.9 82.1,29.3 84.1,30.1 86.2,29.5 88.2,29.3 90.3,30.8 92.3,29.6 94.4,28.2 96.4,25.8 98.5,26.7 100.5,28.9 102.6,29.7 104.6,29.8 106.7,31.3 108.7,31.5 110.8,32.8 112.8,33.0 114.9,30.7 116.9,31.1 119.0,32.8 121.0,32.5 123.1,33.1 125.1,33.4 127.2,34.3 129.2,35.4 131.3,36.0 133.3,38.0 135.4,37.4 137.4,37.6 139.5,37.5 141.5,36.7 143.6,35.9 145.6,36.4 147.7,33.8 149.7,34.5 151.8,34.3 153.8,34.8 155.9,36.3 157.9,33.4 160.0,33.4"/></svg>
+    </div>
+    <div class="tile big">
+      <div class="t-name">Nasdaq<span class="t-sym">^IXIC</span></div>
+      <div class="t-row">
+        <div class="t-price">24,328.38</div>
+        <div class="chg down">▼ −0.74%</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 160 40" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="160" y1="3.1" y2="3.1" class="base"/><polyline points="0.0,5.1 2.1,4.8 4.1,6.7 6.2,4.1 8.2,5.5 10.3,2.0 12.3,5.2 14.4,9.1 16.4,7.5 18.5,9.8 20.5,9.4 22.6,11.3 24.6,17.2 26.7,19.7 28.7,27.8 30.8,34.6 32.8,38.0 34.9,24.5 36.9,20.5 39.0,18.5 41.0,20.1 43.1,21.8 45.1,23.6 47.2,23.0 49.2,25.8 51.3,25.4 53.3,26.7 55.4,28.8 57.4,31.0 59.5,24.7 61.5,29.4 63.6,23.2 65.6,22.4 67.7,14.6 69.7,16.3 71.8,16.7 73.8,19.1 75.9,21.6 77.9,19.6 80.0,22.6 82.1,21.7 84.1,21.5 86.2,21.4 88.2,21.1 90.3,22.8 92.3,21.1 94.4,19.5 96.4,16.0 98.5,16.7 100.5,20.2 102.6,21.5 104.6,21.7 106.7,23.0 108.7,22.0 110.8,22.3 112.8,21.2 114.9,17.7 116.9,18.8 119.0,20.9 121.0,21.6 123.1,21.7 125.1,22.0 127.2,21.8 129.2,24.2 131.3,24.2 133.3,26.2 135.4,26.1 137.4,25.8 139.5,25.2 141.5,23.7 143.6,22.6 145.6,23.4 147.7,20.2 149.7,20.8 151.8,20.8 153.8,21.9 155.9,22.2 157.9,16.2 160.0,15.8"/></svg>
+    </div>
+    <div class="tile big">
+      <div class="t-name">Russell 2000<span class="t-sym">^RUT</span></div>
+      <div class="t-row">
+        <div class="t-price">2,701.87</div>
+        <div class="chg down">▼ −1.50%</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 160 40" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="160" y1="2.0" y2="2.0" class="base"/><polyline points="0.0,7.3 2.1,6.0 4.1,5.2 6.2,5.1 8.2,8.2 10.3,7.3 12.3,9.0 14.4,10.8 16.4,12.9 18.5,15.1 20.5,12.9 22.6,12.7 24.6,16.5 26.7,19.4 28.7,27.2 30.8,34.2 32.8,38.0 34.9,31.2 36.9,29.5 39.0,29.2 41.0,28.7 43.1,29.8 45.1,32.3 47.2,32.3 49.2,32.7 51.3,33.2 53.3,32.3 55.4,33.4 57.4,33.6 59.5,29.1 61.5,29.9 63.6,22.0 65.6,20.9 67.7,14.5 69.7,16.9 71.8,18.2 73.8,19.3 75.9,20.8 77.9,19.9 80.0,20.9 82.1,21.0 84.1,22.1 86.2,22.9 88.2,22.0 90.3,24.0 92.3,24.0 94.4,23.7 96.4,20.6 98.5,21.2 100.5,23.4 102.6,24.7 104.6,25.1 106.7,25.8 108.7,26.6 110.8,28.0 112.8,28.3 114.9,26.9 116.9,26.6 119.0,27.1 121.0,28.0 123.1,28.5 125.1,29.6 127.2,30.3 129.2,31.8 131.3,32.6 133.3,34.7 135.4,36.0 137.4,35.2 139.5,35.4 141.5,35.0 143.6,32.8 145.6,33.0 147.7,32.0 149.7,32.1 151.8,31.1 153.8,31.7 155.9,34.2 157.9,32.8 160.0,33.9"/></svg>
+    </div>
+    <div class="tile big">
+      <div class="t-name">VIX<span class="t-sym">^VIX</span></div>
+      <div class="t-row">
+        <div class="t-price">25.46</div>
+        <div class="chg up">▲ +11.13%</div>
+      </div>
+      <svg class="spark up" viewBox="0 0 160 40" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="160" y1="34.8" y2="34.8" class="base"/><polyline points="0.0,33.1 1.8,34.9 3.6,35.1 5.4,34.7 7.2,35.0 9.0,34.9 10.8,35.4 12.6,35.3 14.4,34.0 16.2,34.4 18.0,34.2 19.8,36.3 21.6,37.2 23.4,38.0 25.2,36.1 27.0,34.9 28.8,35.6 30.6,34.4 32.4,34.9 34.2,34.3 36.0,29.2 37.8,25.3 39.6,17.3 41.3,8.7 43.1,5.3 44.9,18.0 46.7,21.2 48.5,23.1 50.3,22.1 52.1,19.0 53.9,16.0 55.7,14.6 57.5,10.5 59.3,9.7 61.1,9.3 62.9,6.4 64.7,2.0 66.5,9.8 68.3,7.0 70.1,16.6 71.9,17.5 73.7,23.0 75.5,21.7 77.3,20.2 79.1,17.5 80.9,14.1 82.7,15.8 84.5,13.1 86.3,13.7 88.1,13.4 89.9,13.0 91.7,14.6 93.5,13.5 95.3,14.1 97.1,14.1 98.9,18.1 100.7,18.5 102.5,16.2 104.3,15.0 106.1,13.7 107.9,13.0 109.7,13.4 111.5,12.1 113.3,12.5 115.1,16.8 116.9,16.4 118.7,14.6 120.4,13.3 122.2,12.7 124.0,12.2 125.8,11.6 127.6,10.4 129.4,10.2 131.2,7.7 133.0,6.3 134.8,5.5 136.6,6.3 138.4,7.0 140.2,9.6 142.0,9.9 143.8,13.9 145.6,15.5 147.4,15.3 149.2,13.7 151.0,11.7 152.8,15.7 154.6,17.9 156.4,16.2 158.2,17.1 160.0,17.0"/></svg>
+    </div></div>
+  </div>
+
+  <div class="section grid2">
+    <div class="card brief">
+      <h2>The Brief</h2>
+      <p>The S&amp;P 500 fell 1.03% to 7,340.53, with the Dow −1.64% and the Nasdaq −0.74%.</p><p>Over the past week the S&amp;P is −2.40% and −4.55% over the past month; it sits 6.1% below its 3-month high.</p><p>All 11 sectors are lower; Energy is holding up best (−0.52%) while Financials is the weakest (−1.91%).</p><p>The VIX is 25.5 (elevated, +11.1%); the 10-year yield is 5.10% (−2 bps); WTI crude is $85.61 (−0.13%); gold is −0.03%; the dollar is +0.00%; bitcoin is −0.53%.</p><p>Biggest watchlist movers: Broadcom +2.46%, JPMorgan −2.44%.</p>
+      <ul class="top"><li><span class="src">Wall Street Journal</span><a href="https://www.wsj.com/finance/stocks/u-s-stocks-fall-as-ai-doubts-fester-a0979bdb?mod=rss_markets_main" target="_blank" rel="noopener">U.S. Stocks Fall as AI Doubts Fester</a></li><li><span class="src">Yahoo Finance</span><a href="https://finance.yahoo.com/m/3b22ed8c-00c3-32f8-89f5-91bc21ccb366/dow-jones-futures%3A-nvidia.html?.tsrc=rss" target="_blank" rel="noopener">Dow Jones Futures: Nvidia Beats Views, Says This On Jensen Huang; Target, Anthropic IPO Ahead</a></li><li><span class="src">MarketWatch</span><a href="https://www.marketwatch.com/story/nvidia-spooked-me-should-i-sell-my-stocks-or-ride-out-the-market-turmoil-560583c6?mod=mw_rss_topstories" target="_blank" rel="noopener">‘Nvidia’s turmoil has me spooked’: Has the time come to sell my stocks?</a></li></ul>
+    </div>
+    <div class="card">
+      <h2>Sector Performance · S&amp;P SPDR ETFs</h2>
+      <div class="heat"><div class="cell" style="background: rgba(var(--down-rgb), 0.24);"><span class="c-name">Energy</span><span class="c-sym">XLE</span><span class="c-pct">−0.52%</span></div><div class="cell" style="background: rgba(var(--down-rgb), 0.25);"><span class="c-name">Industrials</span><span class="c-sym">XLI</span><span class="c-pct">−0.55%</span></div><div class="cell" style="background: rgba(var(--down-rgb), 0.33);"><span class="c-name">Cons. Discretionary</span><span class="c-sym">XLY</span><span class="c-pct">−0.89%</span></div><div class="cell" style="background: rgba(var(--down-rgb), 0.34);"><span class="c-name">Technology</span><span class="c-sym">XLK</span><span class="c-pct">−0.91%</span></div><div class="cell" style="background: rgba(var(--down-rgb), 0.41);"><span class="c-name">Materials</span><span class="c-sym">XLB</span><span class="c-pct">−1.22%</span></div><div class="cell" style="background: rgba(var(--down-rgb), 0.42);"><span class="c-name">Cons. Staples</span><span class="c-sym">XLP</span><span class="c-pct">−1.23%</span></div><div class="cell" style="background: rgba(var(--down-rgb), 0.46);"><span class="c-name">Health Care</span><span class="c-sym">XLV</span><span class="c-pct">−1.41%</span></div><div class="cell" style="background: rgba(var(--down-rgb), 0.47);"><span class="c-name">Comm. Services</span><span class="c-sym">XLC</span><span class="c-pct">−1.46%</span></div><div class="cell" style="background: rgba(var(--down-rgb), 0.48);"><span class="c-name">Real Estate</span><span class="c-sym">XLRE</span><span class="c-pct">−1.49%</span></div><div class="cell" style="background: rgba(var(--down-rgb), 0.50);"><span class="c-name">Utilities</span><span class="c-sym">XLU</span><span class="c-pct">−1.59%</span></div><div class="cell" style="background: rgba(var(--down-rgb), 0.58);"><span class="c-name">Financials</span><span class="c-sym">XLF</span><span class="c-pct">−1.91%</span></div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Rates, Dollar &amp; Commodities</h2>
+    <div class="tiles">
+    <div class="tile ">
+      <div class="t-name">10Y Treasury<span class="t-sym">^TNX</span></div>
+      <div class="t-row">
+        <div class="t-price">5.103%</div>
+        <div class="chg down">▼ −1.8 bps</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="120" y1="15.2" y2="15.2" class="base"/><polyline points="0.0,14.4 1.5,13.5 3.0,5.8 4.6,6.7 6.1,6.7 7.6,5.8 9.1,5.0 10.6,5.0 12.2,5.0 13.7,5.0 15.2,3.3 16.7,5.0 18.2,3.3 19.7,5.0 21.3,5.0 22.8,5.0 24.3,5.8 25.8,4.1 27.3,3.3 28.9,2.0 30.4,4.1 31.9,5.8 33.4,5.8 34.9,6.7 36.5,6.7 38.0,9.2 39.5,13.5 41.0,16.1 42.5,20.3 44.1,22.0 45.6,25.4 47.1,18.6 48.6,16.9 50.1,16.9 51.6,16.9 53.2,18.6 54.7,22.0 56.2,22.0 57.7,22.9 59.2,23.7 60.8,24.6 62.3,25.4 63.8,25.4 65.3,22.9 66.8,27.1 68.4,24.6 69.9,25.4 71.4,22.0 72.9,23.7 74.4,26.3 75.9,27.1 77.5,26.3 79.0,27.1 80.5,27.1 82.0,28.0 83.5,27.1 85.1,27.1 86.6,27.1 88.1,27.1 89.6,27.1 91.1,26.3 92.7,22.9 94.2,22.9 95.7,23.7 97.2,25.4 98.7,23.7 100.3,24.6 101.8,22.9 103.3,22.0 104.8,21.2 106.3,20.3 107.8,22.9 109.4,23.7 110.9,22.9 112.4,24.6 113.9,26.3 115.4,25.4 117.0,25.4 118.5,23.7 120.0,22.9"/></svg>
+    </div>
+    <div class="tile ">
+      <div class="t-name">30Y Treasury<span class="t-sym">^TYX</span></div>
+      <div class="t-row">
+        <div class="t-price">5.458%</div>
+        <div class="chg down">▼ −0.9 bps</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="120" y1="15.3" y2="15.3" class="base"/><polyline points="0.0,12.8 1.5,12.8 3.0,7.7 4.6,6.4 6.1,6.4 7.6,5.2 9.1,4.5 10.6,3.9 12.2,5.2 13.7,5.2 15.2,3.3 16.7,3.9 18.2,3.3 19.7,4.5 21.3,5.2 22.8,4.5 24.3,4.5 25.8,4.5 27.3,3.3 28.9,2.0 30.4,3.3 31.9,3.9 33.4,3.9 34.9,3.9 36.5,4.5 38.0,7.7 39.5,11.5 41.0,13.4 42.5,18.5 44.1,18.5 45.6,22.9 47.1,14.7 48.6,13.4 50.1,14.0 51.6,14.7 53.2,16.6 54.7,19.1 56.2,19.1 57.7,20.4 59.2,21.0 60.8,22.3 62.3,23.6 63.8,24.8 65.3,21.0 66.8,26.1 68.4,24.2 69.9,24.2 71.4,21.7 72.9,22.3 74.4,26.7 75.9,27.4 77.5,24.8 79.0,26.1 80.5,26.7 82.0,28.0 83.5,26.7 85.1,26.7 86.6,26.1 88.1,26.7 89.6,26.7 91.1,26.7 92.7,22.3 94.2,21.7 95.7,22.9 97.2,24.8 98.7,22.3 100.3,22.9 101.8,20.4 103.3,17.9 104.8,17.9 106.3,17.2 107.8,19.1 109.4,20.4 110.9,19.8 112.4,21.0 113.9,23.6 115.4,22.9 117.0,22.3 118.5,20.4 120.0,21.0"/></svg>
+    </div>
+    <div class="tile ">
+      <div class="t-name">US Dollar<span class="t-sym">DX-Y.NYB</span></div>
+      <div class="t-row">
+        <div class="t-price">103.55</div>
+        <div class="chg flat">+0.00%</div>
+      </div>
+      <svg class="spark up" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="120" y1="9.6" y2="9.6" class="base"/><polyline points="0.0,2.0 1.3,2.0 2.7,3.4 4.0,3.0 5.4,3.9 6.7,2.9 8.1,7.0 9.4,9.5 10.8,10.6 12.1,15.4 13.5,15.2 14.8,17.6 16.2,13.9 17.5,12.9 18.9,16.2 20.2,19.9 21.6,19.1 22.9,23.3 24.3,20.5 25.6,22.6 27.0,21.3 28.3,22.4 29.7,21.5 31.0,23.5 32.4,21.7 33.7,22.1 35.1,21.8 36.4,24.0 37.8,23.6 39.1,24.9 40.4,24.6 41.8,25.0 43.1,24.2 44.5,24.0 45.8,24.4 47.2,26.2 48.5,26.2 49.9,28.0 51.2,26.8 52.6,26.9 53.9,25.9 55.3,23.3 56.6,22.1 58.0,20.4 59.3,19.7 60.7,20.6 62.0,21.5 63.4,21.7 64.7,19.8 66.1,19.1 67.4,19.6 68.8,18.4 70.1,19.3 71.5,18.3 72.8,18.1 74.2,18.2 75.5,19.2 76.9,18.7 78.2,18.2 79.6,18.0 80.9,16.2 82.2,15.7 83.6,14.5 84.9,14.0 86.3,13.2 87.6,14.1 89.0,14.0 90.3,15.2 91.7,15.6 93.0,15.4 94.4,15.5 95.7,14.6 97.1,13.9 98.4,13.6 99.8,13.3 101.1,13.6 102.5,14.2 103.8,12.0 105.2,10.2 106.5,10.0 107.9,10.8 109.2,10.0 110.6,10.4 111.9,9.0 113.3,8.4 114.6,8.5 116.0,9.0 117.3,9.4 118.7,9.4 120.0,9.3"/></svg>
+    </div>
+    <div class="tile ">
+      <div class="t-name">WTI Crude<span class="t-sym">CL=F</span></div>
+      <div class="t-row">
+        <div class="t-price">85.61</div>
+        <div class="chg down">▼ −0.13%</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="120" y1="23.0" y2="23.0" class="base"/><polyline points="0.0,5.8 1.3,2.7 2.7,2.0 4.0,3.0 5.4,6.1 6.7,7.0 8.1,5.1 9.4,6.9 10.8,8.1 12.1,11.2 13.5,12.9 14.8,14.7 16.2,14.0 17.5,14.0 18.9,10.1 20.2,11.7 21.6,10.3 22.9,8.5 24.3,3.0 25.6,4.8 27.0,6.9 28.3,8.2 29.7,10.4 31.0,9.4 32.4,10.7 33.7,8.6 35.1,11.7 36.4,12.9 37.8,10.0 39.1,12.2 40.4,12.3 41.8,15.1 43.1,15.0 44.5,14.7 45.8,16.6 47.2,13.5 48.5,11.3 49.9,12.2 51.2,14.3 52.6,13.2 53.9,13.4 55.3,12.3 56.6,11.6 58.0,11.2 59.3,10.6 60.7,10.9 62.0,11.0 63.4,10.3 64.7,11.9 66.1,11.9 67.4,10.7 68.8,11.7 70.1,11.9 71.5,11.2 72.8,11.9 74.2,13.4 75.5,14.9 76.9,17.8 78.2,18.4 79.6,19.0 80.9,20.9 82.2,23.4 83.6,23.9 84.9,27.9 86.3,27.6 87.6,27.6 89.0,28.0 90.3,27.1 91.7,27.3 93.0,23.3 94.4,24.3 95.7,22.2 97.1,23.3 98.4,24.6 99.8,24.2 101.1,23.7 102.5,23.3 103.8,23.0 105.2,23.3 106.5,24.6 107.9,24.2 109.2,23.1 110.6,24.5 111.9,24.5 113.3,24.5 114.6,25.5 116.0,26.4 117.3,24.2 118.7,24.6 120.0,24.6"/></svg>
+    </div>
+    <div class="tile ">
+      <div class="t-name">Gold<span class="t-sym">GC=F</span></div>
+      <div class="t-row">
+        <div class="t-price">3,851.90</div>
+        <div class="chg down">▼ −0.03%</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="120" y1="24.9" y2="24.9" class="base"/><polyline points="0.0,13.3 1.3,13.4 2.7,14.5 4.0,16.6 5.4,18.9 6.7,20.0 8.1,18.9 9.4,21.1 10.8,19.6 12.1,12.1 13.5,11.1 14.8,8.9 16.2,6.2 17.5,2.0 18.9,6.8 20.2,5.7 21.6,7.4 22.9,11.3 24.3,10.9 25.6,11.1 27.0,12.4 28.3,12.3 29.7,11.9 31.0,11.9 32.4,11.7 33.7,13.5 35.1,13.0 36.4,15.7 37.8,14.0 39.1,13.0 40.4,11.5 41.8,11.7 43.1,11.0 44.5,12.2 45.8,12.3 47.2,14.4 48.5,14.2 49.9,14.3 51.2,14.2 52.6,15.5 53.9,15.7 55.3,15.4 56.6,17.5 58.0,17.3 59.3,17.7 60.7,17.2 62.0,17.1 63.4,16.6 64.7,18.4 66.1,19.4 67.4,20.2 68.8,21.5 70.1,21.5 71.5,22.2 72.8,21.9 74.2,20.9 75.5,20.2 76.9,22.4 78.2,22.4 79.6,22.6 80.9,25.0 82.2,25.4 83.6,26.8 84.9,25.8 86.3,27.0 87.6,27.7 89.0,28.0 90.3,25.9 91.7,27.3 93.0,26.2 94.4,26.0 95.7,23.9 97.1,25.1 98.4,24.9 99.8,26.3 101.1,26.9 102.5,26.8 103.8,26.0 105.2,25.5 106.5,25.3 107.9,25.9 109.2,23.2 110.6,23.0 111.9,20.8 113.3,23.9 114.6,24.7 116.0,25.2 117.3,25.2 118.7,25.6 120.0,25.6"/></svg>
+    </div>
+    <div class="tile ">
+      <div class="t-name">Bitcoin<span class="t-sym">BTC-USD</span></div>
+      <div class="t-row">
+        <div class="t-price">64,486.45</div>
+        <div class="chg down">▼ −0.53%</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="120" y1="4.7" y2="4.7" class="base"/><polyline points="0.0,9.4 1.3,8.9 2.7,7.8 4.0,2.0 5.4,2.7 6.7,6.4 8.1,7.5 9.4,16.0 10.8,25.0 12.1,28.0 13.5,17.2 14.8,12.7 16.2,12.1 17.5,15.7 18.9,17.1 20.2,17.3 21.6,20.6 22.9,19.5 24.3,20.9 25.6,21.3 27.0,22.8 28.3,25.7 29.7,23.2 31.0,25.5 32.4,21.2 33.7,21.4 35.1,18.0 36.4,21.6 37.8,22.5 39.1,24.8 40.4,25.0 41.8,22.5 43.1,21.9 44.5,21.3 45.8,21.9 47.2,22.2 48.5,22.5 49.9,23.8 51.2,22.3 52.6,19.4 53.9,19.6 55.3,20.9 56.6,22.2 58.0,23.4 59.3,23.7 60.7,21.1 62.0,22.8 63.4,22.7 64.7,22.2 66.1,21.4 67.4,22.1 68.8,22.5 70.1,23.4 71.5,23.5 72.8,24.2 74.2,22.6 75.5,22.9 76.9,22.6 78.2,23.2 79.6,22.6 80.9,23.0 82.2,22.3 83.6,20.1 84.9,19.3 86.3,19.4 87.6,18.7 89.0,18.4 90.3,19.1 91.7,19.8 93.0,21.0 94.4,19.3 95.7,17.8 97.1,19.1 98.4,17.9 99.8,18.0 101.1,12.2 102.5,12.3 103.8,9.9 105.2,11.3 106.5,12.7 107.9,13.9 109.2,14.0 110.6,13.3 111.9,15.4 113.3,12.4 114.6,11.8 116.0,12.0 117.3,9.8 118.7,9.9 120.0,10.2"/></svg>
+    </div></div>
+  </div>
+
+  <div class="section row2">
+    <div class="stack first"><h2>Index Futures</h2><div class="tiles">
+    <div class="tile ">
+      <div class="t-name">S&amp;P Futures<span class="t-sym">ES=F</span></div>
+      <div class="t-row">
+        <div class="t-price">7,366.50</div>
+        <div class="chg down">▼ −0.97%</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="120" y1="2.0" y2="2.0" class="base"/><polyline points="0.0,5.9 1.3,6.5 2.7,4.3 4.0,3.7 5.4,3.3 6.7,6.0 8.1,8.5 9.4,7.5 10.8,9.1 12.1,8.7 13.5,8.9 14.8,13.7 16.2,14.4 17.5,20.7 18.9,24.8 20.2,28.0 21.6,19.8 22.9,18.1 24.3,16.3 25.6,16.9 27.0,18.5 28.3,19.6 29.7,19.7 31.0,21.1 32.4,21.5 33.7,22.2 35.1,23.9 36.4,25.1 37.8,20.6 39.1,23.8 40.4,19.4 41.8,19.1 43.1,14.0 44.5,15.3 45.8,15.8 47.2,17.4 48.5,19.2 49.9,17.2 51.2,19.3 52.6,19.5 53.9,19.6 55.3,19.1 56.6,19.2 58.0,20.5 59.3,19.4 60.7,17.9 62.0,15.8 63.4,16.5 64.7,18.9 66.1,19.6 67.4,19.6 68.8,21.1 70.1,20.5 71.5,21.1 72.8,20.7 74.2,18.0 75.5,19.0 76.9,20.5 78.2,20.4 79.6,20.9 80.9,21.3 82.2,21.5 83.6,22.9 84.9,23.2 86.3,24.9 87.6,24.4 89.0,24.2 90.3,23.9 91.7,23.0 93.0,22.0 94.4,22.4 95.7,20.1 97.1,20.4 98.4,20.4 99.8,21.2 101.1,22.5 102.5,17.5 103.8,16.8 105.2,18.4 106.5,18.3 107.9,18.9 109.2,15.1 110.6,13.9 111.9,13.9 113.3,15.8 114.6,16.1 116.0,17.0 117.3,17.5 118.7,16.9 120.0,16.9"/></svg>
+    </div>
+    <div class="tile ">
+      <div class="t-name">Nasdaq Futures<span class="t-sym">NQ=F</span></div>
+      <div class="t-row">
+        <div class="t-price">27,126.00</div>
+        <div class="chg down">▼ −0.58%</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="120" y1="3.3" y2="3.3" class="base"/><polyline points="0.0,4.0 1.3,5.5 2.7,3.9 4.0,4.8 5.4,2.0 6.7,4.6 8.1,7.7 9.4,6.7 10.8,7.8 12.1,7.6 13.5,8.9 14.8,13.9 16.2,14.8 17.5,20.6 18.9,25.2 20.2,28.0 21.6,18.1 22.9,15.1 24.3,13.7 25.6,14.9 27.0,16.5 28.3,17.6 29.7,17.2 31.0,18.9 32.4,18.3 33.7,18.9 35.1,20.8 36.4,22.8 37.8,18.4 39.1,21.8 40.4,17.6 41.8,17.0 43.1,11.4 44.5,12.9 45.8,12.9 47.2,14.5 48.5,16.3 49.9,14.8 51.2,16.7 52.6,16.3 53.9,16.2 55.3,16.1 56.6,16.0 58.0,17.2 59.3,15.7 60.7,14.2 62.0,11.8 63.4,12.6 64.7,14.9 66.1,15.9 67.4,16.1 68.8,17.2 70.1,16.4 71.5,16.7 72.8,15.8 74.2,13.1 75.5,14.5 76.9,16.1 78.2,16.1 79.6,16.3 80.9,16.6 82.2,16.5 83.6,18.3 84.9,18.1 86.3,19.6 87.6,19.4 89.0,19.4 90.3,19.1 91.7,18.0 93.0,17.2 94.4,17.5 95.7,15.5 97.1,15.7 98.4,15.6 99.8,16.0 101.1,17.1 102.5,11.4 103.8,8.7 105.2,10.8 106.5,11.1 107.9,11.8 109.2,7.8 110.6,5.7 111.9,5.1 113.3,7.3 114.6,8.4 116.0,9.7 117.3,10.3 118.7,9.8 120.0,9.8"/></svg>
+    </div>
+    <div class="tile ">
+      <div class="t-name">Dow Futures<span class="t-sym">YM=F</span></div>
+      <div class="t-row">
+        <div class="t-price">50,827.00</div>
+        <div class="chg down">▼ −1.63%</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="120" y1="2.0" y2="2.0" class="base"/><polyline points="0.0,11.0 1.3,10.7 2.7,8.0 4.0,6.3 5.4,8.1 6.7,9.8 8.1,11.6 9.4,11.2 10.8,12.6 12.1,11.8 13.5,11.2 14.8,14.6 16.2,15.2 17.5,20.5 18.9,23.5 20.2,26.2 21.6,21.8 22.9,21.4 24.3,20.2 25.6,20.5 27.0,21.7 28.3,22.2 29.7,22.7 31.0,23.2 32.4,23.9 33.7,24.3 35.1,25.0 36.4,25.1 37.8,21.9 39.1,24.3 40.4,21.2 41.8,21.0 43.1,17.6 44.5,19.0 45.8,19.5 47.2,20.3 48.5,21.7 49.9,20.0 51.2,21.3 52.6,21.9 53.9,22.1 55.3,21.8 56.6,21.8 58.0,23.1 59.3,22.1 60.7,21.0 62.0,19.3 63.4,20.1 64.7,21.6 66.1,22.2 67.4,22.3 68.8,23.6 70.1,23.6 71.5,24.3 72.8,24.3 74.2,22.8 75.5,23.2 76.9,24.4 78.2,24.1 79.6,24.4 80.9,24.8 82.2,25.4 83.6,26.2 84.9,26.5 86.3,28.0 87.6,27.6 89.0,27.6 90.3,27.7 91.7,27.1 93.0,26.5 94.4,26.7 95.7,25.1 97.1,25.4 98.4,25.2 99.8,25.8 101.1,26.9 102.5,24.2 103.8,24.3 105.2,25.0 106.5,24.7 107.9,25.2 109.2,24.4 110.6,24.0 111.9,24.0 113.3,24.7 114.6,24.8 116.0,25.1 117.3,24.9 118.7,24.5 120.0,24.5"/></svg>
+    </div></div></div>
+    <div class="stack"><h2>Global Markets</h2><div class="tiles">
+    <div class="tile ">
+      <div class="t-name">Nikkei 225<span class="t-sym">^N225</span></div>
+      <div class="t-row">
+        <div class="t-price">58,860.43</div>
+        <div class="chg down">▼ −1.34%</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="120" y1="2.0" y2="2.0" class="base"/><polyline points="0.0,25.7 1.8,22.0 3.5,16.8 5.3,20.5 7.1,20.0 8.8,19.9 10.6,24.3 12.4,21.3 14.1,18.6 15.9,18.7 17.6,23.6 19.4,22.2 21.2,20.7 22.9,17.6 24.7,13.5 26.5,13.7 28.2,16.4 30.0,19.7 31.8,18.5 33.5,15.5 35.3,15.1 37.1,21.9 38.8,20.6 40.6,23.1 42.4,18.2 44.1,19.4 45.9,24.0 47.6,22.4 49.4,25.6 51.2,24.2 52.9,23.1 54.7,23.1 56.5,13.8 58.2,17.1 60.0,22.1 61.8,23.1 63.5,22.4 65.3,26.4 67.1,28.0 68.8,27.8 70.6,27.9 72.4,27.2 74.1,24.5 75.9,23.0 77.6,20.1 79.4,21.4 81.2,20.2 82.9,19.4 84.7,20.9 86.5,21.1 88.2,27.1 90.0,25.7 91.8,27.4 93.5,22.4 95.3,19.6 97.1,20.3 98.8,20.2 100.6,22.2 102.4,20.8 104.1,19.3 105.9,19.4 107.6,20.1 109.4,20.1 111.2,22.4 112.9,22.2 114.7,23.5 116.5,23.1 118.2,22.9 120.0,26.0"/></svg>
+    </div>
+    <div class="tile ">
+      <div class="t-name">Hang Seng<span class="t-sym">^HSI</span></div>
+      <div class="t-row">
+        <div class="t-price">23,508.17</div>
+        <div class="chg down">▼ −0.55%</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="120" y1="2.0" y2="2.0" class="base"/><polyline points="0.0,21.7 1.7,19.3 3.5,18.9 5.2,24.2 7.0,28.0 8.7,24.4 10.4,21.4 12.2,23.6 13.9,21.6 15.7,19.6 17.4,18.6 19.1,16.5 20.9,18.7 22.6,18.0 24.3,20.8 26.1,19.0 27.8,16.9 29.6,14.0 31.3,10.7 33.0,6.7 34.8,8.0 36.5,8.4 38.3,6.5 40.0,6.2 41.7,6.3 43.5,7.7 45.2,8.5 47.0,9.3 48.7,8.2 50.4,8.6 52.2,8.7 53.9,8.7 55.7,8.6 57.4,8.1 59.1,11.0 60.9,6.2 62.6,6.0 64.3,5.9 66.1,3.9 67.8,5.4 69.6,5.3 71.3,4.5 73.0,8.5 74.8,8.0 76.5,8.9 78.3,10.2 80.0,10.6 81.7,11.4 83.5,12.5 85.2,11.8 87.0,13.8 88.7,12.8 90.4,11.3 92.2,12.5 93.9,12.4 95.7,11.7 97.4,10.5 99.1,10.3 100.9,11.6 102.6,13.1 104.3,10.8 106.1,12.5 107.8,11.3 109.6,11.0 111.3,12.2 113.0,13.1 114.8,11.8 116.5,11.3 118.3,11.3 120.0,15.1"/></svg>
+    </div>
+    <div class="tile ">
+      <div class="t-name">FTSE 100<span class="t-sym">^FTSE</span></div>
+      <div class="t-row">
+        <div class="t-price">10,689.87</div>
+        <div class="chg down">▼ −1.76%</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="120" y1="2.0" y2="2.0" class="base"/><polyline points="0.0,11.1 1.3,12.3 2.7,13.0 4.0,13.7 5.4,13.6 6.7,14.1 8.1,13.9 9.4,14.4 10.8,14.2 12.1,13.8 13.5,14.2 14.8,14.2 16.2,14.1 17.5,13.7 18.9,13.9 20.2,13.8 21.6,12.6 22.9,12.2 24.3,11.5 25.6,11.5 27.0,12.3 28.3,12.3 29.7,12.5 31.0,12.5 32.4,12.8 33.7,12.6 35.1,13.0 36.4,12.9 37.8,12.9 39.1,12.2 40.4,12.2 41.8,12.5 43.1,12.2 44.5,12.7 45.8,12.7 47.2,13.7 48.5,14.0 49.9,14.0 51.2,14.8 52.6,14.5 53.9,15.0 55.3,15.7 56.6,16.6 58.0,16.7 59.3,15.7 60.7,15.3 62.0,16.1 63.4,16.7 64.7,16.9 66.1,17.1 67.4,17.8 68.8,18.1 70.1,18.3 71.5,19.0 72.8,19.6 74.2,19.2 75.5,18.7 76.9,19.3 78.2,18.9 79.6,19.1 80.9,20.3 82.2,20.5 83.6,20.5 84.9,20.6 86.3,20.6 87.6,17.9 89.0,17.6 90.3,18.4 91.7,17.6 93.0,16.9 94.4,18.3 95.7,19.4 97.1,19.8 98.4,20.0 99.8,21.1 101.1,20.3 102.5,19.2 103.8,19.5 105.2,20.6 106.5,23.2 107.9,26.7 109.2,28.0 110.6,25.3 111.9,26.1 113.3,25.4 114.6,25.5 116.0,26.2 117.3,26.8 118.7,27.0 120.0,28.0"/></svg>
+    </div>
+    <div class="tile ">
+      <div class="t-name">DAX<span class="t-sym">^GDAXI</span></div>
+      <div class="t-row">
+        <div class="t-price">26,045.37</div>
+        <div class="chg down">▼ −2.08%</div>
+      </div>
+      <svg class="spark down" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="120" y1="2.0" y2="2.0" class="base"/><polyline points="0.0,12.1 1.3,13.1 2.7,14.6 4.0,14.8 5.4,14.5 6.7,14.8 8.1,13.5 9.4,13.6 10.8,13.2 12.1,13.3 13.5,13.7 14.8,13.7 16.2,13.4 17.5,12.5 18.9,12.8 20.2,12.6 21.6,11.5 22.9,11.4 24.3,10.4 25.6,10.9 27.0,11.7 28.3,11.6 29.7,11.9 31.0,11.4 32.4,11.1 33.7,10.8 35.1,10.9 36.4,11.0 37.8,10.6 39.1,10.1 40.4,9.9 41.8,9.7 43.1,9.7 44.5,9.4 45.8,9.6 47.2,10.5 48.5,10.5 49.9,10.4 51.2,11.0 52.6,11.2 53.9,11.6 55.3,12.1 56.6,13.2 58.0,13.4 59.3,12.9 60.7,12.4 62.0,13.2 63.4,13.8 64.7,13.8 66.1,14.1 67.4,14.7 68.8,15.4 70.1,15.5 71.5,16.4 72.8,17.0 74.2,16.7 75.5,16.3 76.9,16.6 78.2,16.2 79.6,15.8 80.9,16.7 82.2,16.8 83.6,17.0 84.9,17.1 86.3,16.9 87.6,16.5 89.0,16.1 90.3,16.7 91.7,16.7 93.0,16.6 94.4,17.4 95.7,18.7 97.1,19.8 98.4,19.7 99.8,20.8 101.1,19.6 102.5,19.2 103.8,19.5 105.2,20.8 106.5,23.2 107.9,26.5 109.2,28.0 110.6,24.9 111.9,25.3 113.3,24.6 114.6,25.6 116.0,25.7 117.3,26.5 118.7,25.8 120.0,27.3"/></svg>
+    </div></div></div>
+  </div>
+
+  <div class="section grid2">
+    <div class="card">
+      <h2>Headlines</h2>
+      <div class="feeds"><section class="feed"><h3>Wall Street Journal</h3><ol><li><a href="https://www.wsj.com/finance/stocks/u-s-stocks-fall-as-ai-doubts-fester-a0979bdb?mod=rss_markets_main" target="_blank" rel="noopener">U.S. Stocks Fall as AI Doubts Fester</a><span class="when">19m ago</span></li><li><a href="https://www.wsj.com/finance/investing/energy-utilities-roundup-market-talk-554ef0f3?mod=rss_markets_main" target="_blank" rel="noopener">Energy &amp; Utilities Roundup: Market Talk</a><span class="when">33m ago</span></li><li><a href="https://www.wsj.com/finance/stocks/slower-retail-sales-drag-on-market-fd1db66a?mod=rss_markets_main" target="_blank" rel="noopener">Slower Retail Sales Drag on Market</a><span class="when">37m ago</span></li><li><a href="https://www.wsj.com/business/sec-is-probing-nvidia-amid-departure-of-ceo-jensen-huang-ee7643f8?mod=rss_markets_main" target="_blank" rel="noopener">SEC Is Probing Nvidia Amid Departure of CEO Jensen Huang</a><span class="when">1h ago</span></li><li><a href="https://www.wsj.com/finance/commodities-futures/oil-falls-as-improving-supply-prospects-offset-mideast-tensions-3499b2f6?mod=rss_markets_main" target="_blank" rel="noopener">Oil Futures Post Modest Gains</a><span class="when">1h ago</span></li><li><a href="https://www.wsj.com/finance/commodities-futures/oil-prices-continue-to-fall-as-global-supply-surplus-weighs-7b54e93b?mod=rss_markets_main" target="_blank" rel="noopener">Oil Futures Rise as Middle East Shipping Risks Persist</a><span class="when">1h ago</span></li><li><a href="https://www.wsj.com/finance/commodities-futures/u-s-natural-gas-futures-extend-retreat-985bb896?mod=rss_markets_main" target="_blank" rel="noopener">U.S. Natural Gas Futures Settle Higher</a><span class="when">1h ago</span></li><li><a href="https://www.wsj.com/finance/corporate-card-startup-ramp-raising-funds-at-70-billion-valuation-631b071a?mod=rss_markets_main" target="_blank" rel="noopener">Corporate-Card Startup Ramp Raising Funds at $70 Billion Valuation</a><span class="when">2h ago</span></li></ol></section><section class="feed"><h3>Yahoo Finance</h3><ol><li><a href="https://finance.yahoo.com/m/3b22ed8c-00c3-32f8-89f5-91bc21ccb366/dow-jones-futures%3A-nvidia.html?.tsrc=rss" target="_blank" rel="noopener">Dow Jones Futures: Nvidia Beats Views, Says This On Jensen Huang; Target, Anthropic IPO Ahead</a><span class="when">7m ago</span></li><li><a href="https://finance.yahoo.com/markets/stocks/articles/us-equity-indexes-retreat-amid-220353095.html?.tsrc=rss" target="_blank" rel="noopener">Update: US Equity Indexes Retreat Amid a Broad-Based Sectoral Sell-Off</a><span class="when">22m ago</span></li><li><a href="https://stocktwits.com/news-articles/markets/equity/fund-manager-lists-three-reasons-he-still-won-t-buy-tesla-stock/cNbOJB3R9hQ?.tsrc=rss" target="_blank" rel="noopener">Fund Manager Lists Three Reasons He Still Won’t Buy Tesla Stock</a><span class="when">22m ago</span></li><li><a href="https://beincrypto.com/nvidia-earnings-first-report-jensen-huang-exit/?.tsrc=rss" target="_blank" rel="noopener">Jensen Huang’s Last Quarter Beats Estimates: Can Nvidia Stock Recover Without Him?</a><span class="when">45m ago</span></li><li><a href="https://finance.yahoo.com/m/0c9330f2-68c3-38ef-9244-7dbdfd0853b7/stock-market-today%3A-dow.html?.tsrc=rss" target="_blank" rel="noopener">Stock Market Today: Dow Dives, Nvidia Falls Amid This Jensen Huang Offer; Cyber Plays Mixed</a><span class="when">45m ago</span></li><li><a href="https://finance.yahoo.com/markets/world-indices/articles/major-us-stock-indexes-fared-214025410.html?.tsrc=rss" target="_blank" rel="noopener">How major US stock indexes fared Tuesday 11/17/2026</a><span class="when">46m ago</span></li><li><a href="https://finance.yahoo.com/markets/stocks/articles/pseg-declares-regular-quarterly-dividend-213000849.html?.tsrc=rss" target="_blank" rel="noopener">PSEG Declares Regular Quarterly Dividend for the Fourth Quarter of 2026</a><span class="when">56m ago</span></li><li><a href="https://www.ibtimes.com/us-stocks-fall-ahead-nvidia-earnings-higher-rates-3809883?.tsrc=rss" target="_blank" rel="noopener">Dow Drops Nearly 860 Points as Stock Market Selloff Deepens Ahead of Nvidia Earnings</a><span class="when">59m ago</span></li></ol></section><section class="feed"><h3>MarketWatch</h3><ol><li><a href="https://www.marketwatch.com/story/nvidia-spooked-me-should-i-sell-my-stocks-or-ride-out-the-market-turmoil-560583c6?mod=mw_rss_topstories" target="_blank" rel="noopener">‘Nvidia’s turmoil has me spooked’: Has the time come to sell my stocks?</a><span class="when">11m ago</span></li><li><a href="https://www.marketwatch.com/story/want-to-earn-5-on-shorter-term-treasurys-again-watch-for-this-shift-d6ff42f2?mod=mw_rss_topstories" target="_blank" rel="noopener">Want to earn 5% on shorter-term Treasurys again? Watch for this shift.</a><span class="when">18m ago</span></li><li><a href="https://www.marketwatch.com/story/she-has-a-history-of-financial-mismanagement-my-brother-cut-my-sister-out-of-his-will-im-getting-everything-do-i-tell-her-3e537851?mod=mw_rss_topstories" target="_blank" rel="noopener">My older brother, who has no children, cut our only sister out of his will. I’ll get everything instead. Do I tell her?</a><span class="when">56m ago</span></li><li><a href="https://www.marketwatch.com/story/why-salesforces-stock-is-leading-s-p-500-decliners-amid-tech-jitters-17510caf?mod=mw_rss_topstories" target="_blank" rel="noopener">Why Salesforce’s stock led the S&amp;P 500’s decliners amid tech jitters</a><span class="when">1h ago</span></li><li><a href="https://www.marketwatch.com/story/nows-the-perfect-time-for-networking-heres-how-to-send-a-cringe-free-email-73ad34ea?mod=mw_rss_topstories" target="_blank" rel="noopener">‘Can I pick your brain?’ and other terrible things to say in a networking email</a><span class="when">1h ago</span></li><li><a href="https://www.marketwatch.com/story/it-leaves-me-with-a-sour-taste-my-elderly-mother-gave-our-cousin-800-for-a-car-repair-should-i-be-worried-88dbd188?mod=mw_rss_topstories" target="_blank" rel="noopener">‘It leaves me with a sour taste’: My elderly mother gave our cousin $800 for a car repair. Should I be worried?</a><span class="when">1h ago</span></li><li><a href="https://www.marketwatch.com/story/summit-therapeutics-stock-tumbles-again-as-fda-recommends-new-trial-for-lung-cancer-drug-dcb8ff55?mod=mw_rss_topstories" target="_blank" rel="noopener">Summit Therapeutics’ stock tumbles again as FDA recommends new trial for lung-cancer drug</a><span class="when">1h ago</span></li><li><a href="https://www.marketwatch.com/story/the-latest-tech-failure-u-s-classified-national-security-communications-network-ad271899?mod=mw_rss_topstories" target="_blank" rel="noopener">The U.S.’s classified national-security communications network experiences tech outage</a><span class="when">1h ago</span></li></ol></section><section class="feed"><h3>CNBC</h3><ol><li><a href="https://www.cnbc.com/2026/11/17/us-tech-firms-china-ties-political-pressure.html" target="_blank" rel="noopener">U.S. companies from Nvidia to Apple face a growing China dilemma</a><span class="when">13h ago</span></li><li><a href="https://www.cnbc.com/2026/11/16/berkshire-hathaway-raised-its-stake-in-delta-air-in-the-third-quarter.html" target="_blank" rel="noopener">Berkshire Hathaway raised its stake in Delta in the third quarter. It also trimmed a key bank holding</a><span class="when">23h ago</span></li><li><a href="https://www.cnbc.com/2026/11/16/us-crude-oil-declines-to-87-a-barrel-on-recovering-middle-east-exports.html" target="_blank" rel="noopener">U.S. crude oil declines to $85 a barrel on recovering Middle East exports</a><span class="when">1d ago</span></li><li><a href="https://www.cnbc.com/2026/11/16/jpmorgan-chase-technical-issue.html" target="_blank" rel="noopener">JPMorgan Chase says temporary software bug is affecting consumer banking</a><span class="when">1d ago</span></li><li><a href="https://www.cnbc.com/2026/11/16/fed-ai-task-force-kevin-warsh.html" target="_blank" rel="noopener">Fed Chairman Kevin Warsh stresses importance of AI to economy, but says it could ‘disappoint’</a><span class="when">1d ago</span></li><li><a href="https://www.cnbc.com/2026/11/14/foundation-payroll-ceo-loan.html" target="_blank" rel="noopener">Eric Trump-backed robot soldier startup can&#x27;t pay staff after founder borrowed $4.6 million from company to buy home</a><span class="when">1d ago</span></li><li><a href="https://www.cnbc.com/2026/11/13/howard-lutnick-nvidia-jensen-huang-china-cantor-fitzgerald.html" target="_blank" rel="noopener">Lutnick faces questions over Nvidia spy scandal. His sons&#x27; firm has ties to the chipmaker</a><span class="when">1d ago</span></li><li><a href="https://www.cnbc.com/2026/11/14/nvidia-ai-trade-data-centers-congress.html" target="_blank" rel="noopener">How Nvidia turmoil and a Democratic Congress could reshape the AI trade, according to ETF experts</a><span class="when">1d ago</span></li></ol></section></div>
+    </div>
+    <div class="card">
+      <h2>Watchlist</h2>
+      <table><tr><td><b>AVGO</b> <span class="muted">Broadcom</span></td><td class="num">341.60</td><td class="num chg up">+2.46%</td><td class="sp"><svg class="spark up" viewBox="0 0 90 22" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="90" y1="16.2" y2="16.2" class="base"/><polyline points="0.0,9.4 1.2,6.5 2.3,7.3 3.5,5.7 4.6,6.7 5.8,3.1 6.9,6.0 8.1,8.4 9.2,7.0 10.4,9.0 11.5,6.6 12.7,7.9 13.8,11.9 15.0,12.6 16.2,15.6 17.3,18.4 18.5,20.0 19.6,12.0 20.8,7.8 21.9,6.4 23.1,7.6 24.2,9.0 25.4,11.2 26.5,10.2 27.7,12.2 28.8,10.9 30.0,10.9 31.2,13.6 32.3,15.5 33.5,12.7 34.6,15.1 35.8,11.5 36.9,9.9 38.1,4.9 39.2,5.1 40.4,5.4 41.5,5.8 42.7,7.0 43.8,6.7 45.0,8.0 46.2,7.8 47.3,7.5 48.5,8.1 49.6,8.1 50.8,9.1 51.9,7.3 53.1,6.3 54.2,4.6 55.4,5.4 56.5,7.8 57.7,9.0 58.8,9.5 60.0,10.1 61.2,8.7 62.3,9.6 63.5,9.1 64.6,6.7 65.8,8.4 66.9,9.1 68.1,8.7 69.2,7.7 70.4,8.9 71.5,8.6 72.7,9.6 73.8,9.3 75.0,10.6 76.2,11.2 77.3,11.9 78.5,11.2 79.6,9.7 80.8,8.4 81.9,8.7 83.1,6.2 84.2,6.6 85.4,6.4 86.5,7.1 87.7,8.3 88.8,2.0 90.0,2.2"/></svg></td></tr><tr><td><b>XOM</b> <span class="muted">Exxon</span></td><td class="num">167.21</td><td class="num chg up">+0.20%</td><td class="sp"><svg class="spark up" viewBox="0 0 90 22" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="90" y1="16.8" y2="16.8" class="base"/><polyline points="0.0,8.8 1.2,5.8 2.3,3.8 3.5,3.1 4.6,2.0 5.8,5.3 6.9,9.4 8.1,8.2 9.2,8.4 10.4,7.7 11.5,9.6 12.7,8.9 13.8,9.4 15.0,6.8 16.2,7.1 17.3,6.6 18.5,8.1 19.6,9.4 20.8,9.4 21.9,8.1 23.1,8.8 24.2,10.5 25.4,10.2 26.5,9.5 27.7,11.2 28.8,12.7 30.0,11.5 31.2,12.9 32.3,12.8 33.5,12.9 34.6,13.8 35.8,13.6 36.9,13.9 38.1,12.3 39.2,13.1 40.4,13.5 41.5,13.6 42.7,14.0 43.8,14.3 45.0,14.8 46.2,15.1 47.3,15.3 48.5,15.5 49.6,15.7 50.8,15.2 51.9,15.4 53.1,14.9 54.2,13.8 55.4,13.6 56.5,14.2 57.7,13.6 58.8,12.5 60.0,13.4 61.2,13.9 62.3,14.6 63.5,15.3 64.6,15.5 65.8,15.9 66.9,17.1 68.1,16.0 69.2,16.3 70.4,17.0 71.5,16.5 72.7,17.0 73.8,19.4 75.0,20.0 76.2,18.5 77.3,18.6 78.5,18.9 79.6,19.6 80.8,18.7 81.9,19.6 83.1,16.7 84.2,15.8 85.4,16.4 86.5,15.6 87.7,16.7 88.8,14.8 90.0,14.8"/></svg></td></tr><tr><td><b>TSLA</b> <span class="muted">Tesla</span></td><td class="num">380.11</td><td class="num chg up">+0.10%</td><td class="sp"><svg class="spark up" viewBox="0 0 90 22" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="90" y1="8.0" y2="8.0" class="base"/><polyline points="0.0,4.2 1.2,4.0 2.3,4.1 3.5,2.9 4.6,5.4 5.8,4.0 6.9,2.8 8.1,3.8 9.2,3.0 10.4,4.8 11.5,3.2 12.7,4.8 13.8,8.8 15.0,8.9 16.2,13.1 17.3,18.3 18.5,20.0 19.6,9.9 20.8,9.6 21.9,5.7 23.1,5.7 24.2,9.1 25.4,7.4 26.5,7.3 27.7,9.7 28.8,10.6 30.0,11.1 31.2,11.6 32.3,12.1 33.5,6.6 34.6,10.0 35.8,6.1 36.9,4.9 38.1,2.0 39.2,4.1 40.4,5.0 41.5,6.4 42.7,7.3 43.8,6.3 45.0,7.0 46.2,6.5 47.3,7.1 48.5,6.3 49.6,7.3 50.8,9.2 51.9,8.0 53.1,6.8 54.2,6.0 55.4,7.4 56.5,8.8 57.7,10.0 58.8,10.0 60.0,11.1 61.2,11.4 62.3,11.2 63.5,10.4 64.6,7.2 65.8,7.7 66.9,8.1 68.1,8.0 69.2,7.4 70.4,7.6 71.5,7.7 72.7,8.4 73.8,8.3 75.0,10.9 76.2,9.6 77.3,10.6 78.5,10.9 79.6,9.3 80.8,9.2 81.9,10.7 83.1,7.0 84.2,8.1 85.4,8.2 86.5,8.8 87.7,9.6 88.8,7.0 90.0,7.1"/></svg></td></tr><tr><td><b>AMZN</b> <span class="muted">Amazon</span></td><td class="num">257.89</td><td class="num chg up">+0.05%</td><td class="sp"><svg class="spark up" viewBox="0 0 90 22" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="90" y1="8.3" y2="8.3" class="base"/><polyline points="0.0,7.2 1.2,6.6 2.3,7.3 3.5,5.1 4.6,4.7 5.8,3.2 6.9,4.2 8.1,4.5 9.2,2.0 10.4,4.4 11.5,4.8 12.7,5.4 13.8,7.8 15.0,7.4 16.2,12.6 17.3,17.8 18.5,20.0 19.6,14.4 20.8,14.3 21.9,14.1 23.1,13.9 24.2,15.7 25.4,16.2 26.5,16.8 27.7,17.7 28.8,17.2 30.0,18.0 31.2,19.2 32.3,19.3 33.5,16.3 34.6,18.7 35.8,16.8 36.9,15.0 38.1,11.7 39.2,10.1 40.4,10.9 41.5,12.5 42.7,12.8 43.8,10.5 45.0,11.4 46.2,10.5 47.3,9.9 48.5,9.2 49.6,10.7 50.8,12.0 51.9,12.1 53.1,11.3 54.2,10.2 55.4,10.6 56.5,12.2 57.7,12.4 58.8,11.9 60.0,13.1 61.2,12.7 62.3,11.9 63.5,11.1 64.6,10.3 65.8,10.8 66.9,11.5 68.1,12.1 69.2,12.3 70.4,11.6 71.5,12.3 72.7,12.2 73.8,12.5 75.0,14.1 76.2,12.9 77.3,12.5 78.5,11.7 79.6,9.8 80.8,9.8 81.9,10.3 83.1,8.7 84.2,8.0 85.4,9.0 86.5,10.2 87.7,10.2 88.8,8.0 90.0,7.9"/></svg></td></tr><tr><td><b>AAPL</b> <span class="muted">Apple</span></td><td class="num">351.91</td><td class="num chg down">−0.25%</td><td class="sp"><svg class="spark down" viewBox="0 0 90 22" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="90" y1="10.0" y2="10.0" class="base"/><polyline points="0.0,11.4 1.2,9.3 2.3,9.9 3.5,7.5 4.6,3.1 5.8,2.4 6.9,3.4 8.1,3.5 9.2,2.0 10.4,4.2 11.5,5.0 12.7,5.5 13.8,7.5 15.0,9.1 16.2,13.3 17.3,15.5 18.5,17.1 19.6,13.2 20.8,12.5 21.9,10.4 23.1,11.6 24.2,12.7 25.4,12.1 26.5,11.8 27.7,12.7 28.8,14.9 30.0,15.5 31.2,15.5 32.3,16.1 33.5,12.7 34.6,18.3 35.8,15.1 36.9,16.0 38.1,12.8 39.2,12.8 40.4,13.3 41.5,15.5 42.7,19.6 43.8,16.0 45.0,17.3 46.2,17.8 47.3,18.3 48.5,17.3 49.6,17.1 50.8,18.5 51.9,18.7 53.1,16.7 54.2,15.1 55.4,15.7 56.5,18.1 57.7,18.0 58.8,17.9 60.0,18.9 61.2,20.0 62.3,18.9 63.5,18.9 64.6,17.9 65.8,17.0 66.9,18.2 68.1,18.4 69.2,19.3 70.4,18.1 71.5,17.1 72.7,16.7 73.8,17.2 75.0,19.7 76.2,18.2 77.3,17.5 78.5,18.7 79.6,17.6 80.8,17.4 81.9,18.4 83.1,16.9 84.2,16.7 85.4,16.3 86.5,16.7 87.7,14.7 88.8,13.2 90.0,13.2"/></svg></td></tr><tr><td><b>NVDA</b> <span class="muted">Nvidia</span></td><td class="num">155.46</td><td class="num chg down">−0.44%</td><td class="sp"><svg class="spark down" viewBox="0 0 90 22" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="90" y1="2.0" y2="2.0" class="base"/><polyline points="0.0,3.7 1.2,4.5 2.3,3.3 3.5,3.3 4.6,4.7 5.8,3.2 6.9,5.7 8.1,7.4 9.2,7.6 10.4,9.4 11.5,8.5 12.7,10.0 13.8,14.4 15.0,15.1 16.2,17.7 17.3,19.2 18.5,20.0 19.6,9.9 20.8,7.8 21.9,6.3 23.1,4.6 24.2,4.6 25.4,6.6 26.5,7.0 27.7,10.2 28.8,9.5 30.0,9.0 31.2,9.7 32.3,12.6 33.5,9.7 34.6,11.7 35.8,9.2 36.9,9.1 38.1,6.1 39.2,7.1 40.4,7.7 41.5,8.4 42.7,9.9 43.8,9.1 45.0,11.5 46.2,10.2 47.3,9.2 48.5,9.7 49.6,9.7 50.8,10.3 51.9,9.2 53.1,9.1 54.2,8.6 55.4,8.8 56.5,10.3 57.7,11.2 58.8,11.6 60.0,12.1 61.2,10.2 62.3,10.1 63.5,9.8 64.6,6.8 65.8,8.4 66.9,9.0 68.1,10.2 69.2,9.9 70.4,10.6 71.5,10.4 72.7,13.5 73.8,12.6 75.0,12.6 76.2,14.4 77.3,13.1 78.5,12.0 79.6,11.2 80.8,10.5 81.9,10.6 83.1,10.5 84.2,9.7 85.4,9.5 86.5,10.8 87.7,9.2 88.8,4.2 90.0,4.2"/></svg></td></tr><tr><td><b>BRK-B</b> <span class="muted">Berkshire</span></td><td class="num">586.76</td><td class="num chg down">−1.03%</td><td class="sp"><svg class="spark down" viewBox="0 0 90 22" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="90" y1="2.0" y2="2.0" class="base"/><polyline points="0.0,12.4 1.2,15.3 2.3,14.8 3.5,10.4 4.6,7.7 5.8,11.7 6.9,11.8 8.1,10.2 9.2,11.0 10.4,11.2 11.5,10.6 12.7,6.5 13.8,6.6 15.0,6.4 16.2,10.1 17.3,11.3 18.5,12.9 19.6,14.7 20.8,16.2 21.9,13.5 23.1,12.2 24.2,13.0 25.4,12.0 26.5,13.1 27.7,12.6 28.8,14.1 30.0,14.3 31.2,15.0 32.3,13.3 33.5,12.2 34.6,12.6 35.8,9.9 36.9,9.4 38.1,8.6 39.2,7.5 40.4,7.1 41.5,7.7 42.7,9.2 43.8,8.4 45.0,6.4 46.2,7.7 47.3,8.3 48.5,7.1 49.6,7.3 50.8,7.8 51.9,8.1 53.1,6.3 54.2,4.8 55.4,6.6 56.5,8.4 57.7,7.9 58.8,6.5 60.0,7.7 61.2,8.1 62.3,7.9 63.5,7.7 64.6,6.2 65.8,5.2 66.9,6.7 68.1,6.8 69.2,7.4 70.4,6.3 71.5,6.9 72.7,6.3 73.8,6.8 75.0,8.3 76.2,6.6 77.3,8.0 78.5,8.3 79.6,9.6 80.8,10.4 81.9,10.9 83.1,9.4 84.2,10.4 85.4,11.4 86.5,12.1 87.7,15.5 88.8,18.7 90.0,20.0"/></svg></td></tr><tr><td><b>META</b> <span class="muted">Meta</span></td><td class="num">618.87</td><td class="num chg down">−1.20%</td><td class="sp"><svg class="spark down" viewBox="0 0 90 22" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="90" y1="2.0" y2="2.0" class="base"/><polyline points="0.0,10.1 1.2,8.1 2.3,11.2 3.5,11.5 4.6,9.4 5.8,5.4 6.9,6.2 8.1,8.0 9.2,4.3 10.4,4.4 11.5,5.9 12.7,5.9 13.8,9.7 15.0,9.2 16.2,13.4 17.3,18.8 18.5,20.0 19.6,14.5 20.8,12.3 21.9,12.6 23.1,13.6 24.2,15.0 25.4,16.0 26.5,16.2 27.7,17.6 28.8,17.6 30.0,19.3 31.2,19.9 32.3,19.9 33.5,16.0 34.6,18.4 35.8,15.1 36.9,14.7 38.1,9.8 39.2,10.6 40.4,9.4 41.5,10.7 42.7,11.6 43.8,9.8 45.0,12.5 46.2,13.7 47.3,12.7 48.5,13.0 49.6,12.7 50.8,13.3 51.9,12.4 53.1,10.3 54.2,7.6 55.4,7.3 56.5,8.5 57.7,9.5 58.8,10.0 60.0,11.4 61.2,10.5 62.3,10.2 63.5,10.4 64.6,8.8 65.8,9.0 66.9,11.3 68.1,11.8 69.2,12.6 70.4,12.2 71.5,12.0 72.7,12.4 73.8,13.3 75.0,14.7 76.2,14.0 77.3,14.1 78.5,11.6 79.6,10.7 80.8,9.2 81.9,9.8 83.1,7.6 84.2,10.1 85.4,12.2 86.5,13.0 87.7,14.7 88.8,13.5 90.0,13.6"/></svg></td></tr><tr><td><b>GOOGL</b> <span class="muted">Alphabet</span></td><td class="num">280.20</td><td class="num chg down">−1.24%</td><td class="sp"><svg class="spark down" viewBox="0 0 90 22" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="90" y1="2.0" y2="2.0" class="base"/><polyline points="0.0,7.6 1.2,8.1 2.3,12.1 3.5,10.2 4.6,8.7 5.8,4.5 6.9,6.6 8.1,7.0 9.2,4.2 10.4,5.1 11.5,6.5 12.7,6.4 13.8,9.6 15.0,7.3 16.2,12.9 17.3,18.7 18.5,20.0 19.6,11.9 20.8,12.4 21.9,11.0 23.1,12.6 24.2,14.4 25.4,14.1 26.5,12.7 27.7,13.8 28.8,13.8 30.0,14.3 31.2,14.5 32.3,15.1 33.5,12.0 34.6,13.5 35.8,12.9 36.9,10.4 38.1,7.6 39.2,7.6 40.4,7.0 41.5,8.6 42.7,9.0 43.8,7.8 45.0,9.5 46.2,9.2 47.3,9.3 48.5,9.3 49.6,9.3 50.8,9.9 51.9,9.9 53.1,9.3 54.2,8.5 55.4,9.9 56.5,10.2 57.7,10.5 58.8,10.2 60.0,11.4 61.2,10.7 62.3,10.4 63.5,11.1 64.6,11.7 65.8,11.0 66.9,13.0 68.1,14.5 69.2,15.6 70.4,14.9 71.5,16.6 72.7,16.8 73.8,16.7 75.0,16.8 76.2,16.1 77.3,15.1 78.5,15.0 79.6,14.2 80.8,15.0 81.9,16.7 83.1,14.2 84.2,16.1 85.4,15.9 86.5,16.4 87.7,17.1 88.8,15.3 90.0,15.3"/></svg></td></tr><tr><td><b>GS</b> <span class="muted">Goldman Sachs</span></td><td class="num">877.52</td><td class="num chg down">−1.57%</td><td class="sp"><svg class="spark down" viewBox="0 0 90 22" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="90" y1="2.7" y2="2.7" class="base"/><polyline points="0.0,6.4 1.2,4.7 2.3,4.3 3.5,3.6 4.6,2.6 5.8,2.0 6.9,4.3 8.1,7.8 9.2,7.6 10.4,8.2 11.5,7.3 12.7,6.9 13.8,10.4 15.0,10.9 16.2,16.2 17.3,18.6 18.5,20.0 19.6,15.1 20.8,13.7 21.9,13.5 23.1,14.3 24.2,13.7 25.4,15.8 26.5,15.5 27.7,15.5 28.8,15.8 30.0,15.5 31.2,16.1 32.3,16.6 33.5,14.8 34.6,16.6 35.8,13.9 36.9,13.7 38.1,11.0 39.2,12.5 40.4,12.2 41.5,13.0 42.7,13.9 43.8,12.7 45.0,13.5 46.2,13.6 47.3,13.4 48.5,13.7 49.6,14.1 50.8,15.1 51.9,14.0 53.1,13.6 54.2,12.6 55.4,13.3 56.5,14.2 57.7,15.1 58.8,14.9 60.0,15.2 61.2,15.4 62.3,15.8 63.5,15.9 64.6,14.5 65.8,14.4 66.9,15.2 68.1,15.3 69.2,15.3 70.4,16.0 71.5,15.0 72.7,15.0 73.8,14.7 75.0,16.0 76.2,16.3 77.3,16.1 78.5,15.7 79.6,14.6 80.8,13.4 81.9,13.8 83.1,13.4 84.2,13.1 85.4,13.0 86.5,13.3 87.7,13.7 88.8,12.6 90.0,12.5"/></svg></td></tr><tr><td><b>MSFT</b> <span class="muted">Microsoft</span></td><td class="num">506.24</td><td class="num chg down">−2.27%</td><td class="sp"><svg class="spark down" viewBox="0 0 90 22" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="90" y1="2.0" y2="2.0" class="base"/><polyline points="0.0,5.4 1.2,7.2 2.3,7.6 3.5,7.2 4.6,7.6 5.8,7.2 6.9,8.0 8.1,7.7 9.2,7.4 10.4,7.9 11.5,9.5 12.7,11.0 13.8,12.9 15.0,13.8 16.2,15.7 17.3,16.8 18.5,19.2 19.6,17.1 20.8,16.5 21.9,15.7 23.1,16.9 24.2,17.5 25.4,17.9 26.5,18.4 27.7,17.8 28.8,17.8 30.0,19.4 31.2,20.0 32.3,19.9 33.5,17.4 34.6,18.2 35.8,16.9 36.9,17.4 38.1,15.2 39.2,15.3 40.4,15.0 41.5,16.2 42.7,16.7 43.8,16.3 45.0,17.5 46.2,17.2 47.3,16.8 48.5,16.3 49.6,15.9 50.8,16.1 51.9,15.9 53.1,15.2 54.2,14.3 55.4,13.0 56.5,13.4 57.7,14.1 58.8,14.3 60.0,14.4 61.2,13.8 62.3,13.6 63.5,13.1 64.6,11.7 65.8,11.4 66.9,12.2 68.1,12.3 69.2,12.1 70.4,11.5 71.5,11.5 72.7,12.2 73.8,12.1 75.0,12.4 76.2,12.2 77.3,13.0 78.5,12.6 79.6,12.3 80.8,12.8 81.9,13.0 83.1,12.1 84.2,12.4 85.4,12.6 86.5,13.0 87.7,12.5 88.8,12.1 90.0,12.2"/></svg></td></tr><tr><td><b>JPM</b> <span class="muted">JPMorgan</span></td><td class="num">329.96</td><td class="num chg down">−2.44%</td><td class="sp"><svg class="spark down" viewBox="0 0 90 22" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="90" y1="2.0" y2="2.0" class="base"/><polyline points="0.0,12.0 1.2,10.5 2.3,10.0 3.5,8.1 4.6,6.4 5.8,6.6 6.9,7.8 8.1,9.2 9.2,10.0 10.4,11.5 11.5,9.3 12.7,8.5 13.8,11.1 15.0,12.1 16.2,16.2 17.3,17.3 18.5,18.9 19.6,15.4 20.8,14.8 21.9,14.0 23.1,14.2 24.2,13.8 25.4,15.0 26.5,15.8 27.7,16.3 28.8,17.6 30.0,17.2 31.2,17.2 32.3,17.3 33.5,16.8 34.6,18.7 35.8,16.7 36.9,16.5 38.1,14.5 39.2,15.6 40.4,16.3 41.5,16.7 42.7,18.1 43.8,16.9 45.0,17.7 46.2,17.9 47.3,17.8 48.5,17.9 49.6,17.5 50.8,18.3 51.9,18.0 53.1,17.7 54.2,16.9 55.4,17.2 56.5,18.0 57.7,17.8 58.8,16.9 60.0,17.8 61.2,18.2 62.3,18.6 63.5,18.8 64.6,17.7 65.8,17.1 66.9,17.8 68.1,17.6 69.2,18.0 70.4,17.9 71.5,18.4 72.7,18.3 73.8,18.1 75.0,19.3 76.2,19.3 77.3,18.8 78.5,18.7 79.6,18.2 80.8,17.8 81.9,18.2 83.1,17.5 84.2,17.4 85.4,17.2 86.5,18.3 87.7,20.0 88.8,18.0 90.0,18.1"/></svg></td></tr></table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Briefing Archive</h2>
+    <div class="archive"><a href="2026-11-17_1719_Closing-Briefing.html">Tue Nov 17 · Closing Briefing</a><a href="2026-11-17_1717_Closing-Briefing.html">Tue Nov 17 · Closing Briefing</a><a href="2026-11-17_1615_Closing-Briefing.html">Tue Nov 17 · Closing Briefing</a><a href="2026-11-17_1430_Midday-Update.html">Tue Nov 17 · Midday Update</a><a href="2026-11-17_1421_Midday-Update.html">Tue Nov 17 · Midday Update</a><a href="2026-11-17_1412_Midday-Update.html">Tue Nov 17 · Midday Update</a></div>
+  </div>
+
+  <footer>Prices via Yahoo Finance (may be delayed up to 15 minutes). Headlines via WSJ, Yahoo Finance, MarketWatch and CNBC RSS. This page refreshes itself every 5 minutes.</footer>
+</div>
+</body>
+</html>
