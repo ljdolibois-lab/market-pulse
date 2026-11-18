@@ -81,6 +81,10 @@ h2 { font: 600 11px/1 var(--sans); letter-spacing: .12em; text-transform: upperc
 .mv-note { font-size: 12px; margin: 0 0 6px; }
 table.mv td { padding: 6px 3px; font-size: 13px; }
 .mv-name { line-height: 1.25; }
+a.co { color: inherit; text-decoration: none; display: block; }
+a.co b { color: var(--accent, inherit); }
+a.co:hover b, a.co:focus-visible b { text-decoration: underline; }
+a.co::after { content: " ↗"; font-size: 10px; opacity: .45; }
 .mv-name .muted { font-size: 12px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; }
 .wt { display: block; font-size: 11px; color: var(--muted); }
 .mv-bar { width: 26%; }

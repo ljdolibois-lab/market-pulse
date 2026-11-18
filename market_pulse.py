@@ -536,6 +536,13 @@ def color_nums(text):
     return re.sub(r"[+−]\d[\d,]*(?:\.\d+)?(?:%| bps)", sub, text)
 
 
+def yf_link(ticker, name):
+    """Ticker + company name as one link to its Yahoo Finance quote page."""
+    url = "https://finance.yahoo.com/quote/" + urllib.parse.quote(ticker)
+    return (f'<a class="co" href="{esc(url)}" target="_blank" rel="noopener" title="{esc(name)} on Yahoo Finance">'
+            f'<b>{esc(ticker)}</b> <span class="muted">{esc(name)}</span></a>')
+
+
 def mover_rows(rows, show_impact):
     if not rows:
         return '<p class="muted">Holdings data unavailable right now.</p>'
@@ -548,7 +555,7 @@ def mover_rows(rows, show_impact):
         right = (f'{"+" if r["impact"] > 0 else "−" if r["impact"] < 0 else ""}{abs(r["impact"]):.2f} pts'
                  if show_impact else esc(r.get("sector", "")))
         out.append(
-            f'<tr><td class="mv-name"><b>{esc(r["ticker"])}</b> <span class="muted">{esc(r["name"])}</span>'
+            f'<tr><td class="mv-name">{yf_link(r["ticker"], r["name"])}'
             + (f'<span class="wt">{r["weight"]:.1f}% of sector</span>' if show_impact else "")
             + f'</td><td class="num chg {cls(r["pct"])}">{fmt_pct(r["pct"])}</td>'
             f'<td class="mv-bar"><span class="track">{bar}<span class="mid"></span></span></td>'
@@ -616,7 +623,7 @@ def render(cfg, quotes, news, movers, now, state, holiday, label, brief, top, ar
 
     wl = sorted(quotes["watchlist"], key=lambda q: q["pct"] if q["pct"] is not None else 0, reverse=True)
     rows = "".join(
-        f'<tr><td><b>{esc(q["symbol"])}</b> <span class="muted">{esc(q["name"])}</span></td>'
+        f'<tr><td>{yf_link(q["symbol"], q["name"])}</td>'
         f'<td class="num">{fmt_price(q)}</td>'
         f'<td class="num chg {cls(q["pct"])}">{fmt_pct(q["pct"])}</td>'
         f'<td class="sp">{spark(q["series"], q["prev"], 90, 22)}</td></tr>'
