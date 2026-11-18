@@ -840,8 +840,13 @@ def cmd_run(args):
         json.dump({"generated": now.isoformat(), "label": label, "state": state,
                    "brief": lines, "movers": movers, "quotes": quotes, "news": news}, f, indent=1)
 
+    slug = label.replace(" ", "-")
+    if is_briefing and not args.force and os.path.isdir(ARCHIVE) and any(
+            f.startswith(now.strftime("%Y-%m-%d")) and f.endswith(f"_{slug}.html") for f in os.listdir(ARCHIVE)):
+        # Two triggers (cron-job.org and GitHub's backup schedule) can both fire; only the first sends.
+        print(f"  {label} already sent today; refreshing the page without a second push")
+        is_briefing = False
     if is_briefing:
-        slug = label.replace(" ", "-")
         snap = render(cfg, quotes, news, movers, now, state, holiday, label, brief, top,
                       [(t, "../" + h if not h.startswith("archive/") else h.replace("archive/", ""))
                        for t, h in links], is_snapshot=True)

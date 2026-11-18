@@ -2,6 +2,9 @@ name: Market Pulse
 
 # GitHub cron runs in UTC and ignores daylight saving, so each slot fires at both
 # possible UTC times; market_pulse.py checks Eastern time and skips the wrong one.
+# GitHub often starts scheduled runs hours late, so cron-job.org is the main trigger:
+# it calls workflow_dispatch with {"slot": "...", "test": false} at the exact Eastern time.
+# The schedule below is only a backup; a briefing already sent today is never pushed twice.
 on:
   schedule:
     - cron: "45 13 * * 1-5"      # am briefing (9:45 ET during daylight time)
@@ -16,6 +19,10 @@ on:
         type: choice
         options: [am, pm, intraday]
         default: am
+      test:
+        description: "Test run: ignore the time window and always push"
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -55,4 +62,4 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python market_pulse.py run --slot "${{ steps.slot.outputs.slot }}" ${{ github.event_name == 'workflow_dispatch' && '--force --push' || '' }}
+          python market_pulse.py run --slot "${{ steps.slot.outputs.slot }}" ${{ github.event_name == 'workflow_dispatch' && inputs.test && '--force --push' || '' }}
